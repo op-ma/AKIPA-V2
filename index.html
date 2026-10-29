@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AKIPA - Ajang Kompetisi Pesantren</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['"Plus Jakarta Sans"','sans-serif'],disp:['Fraunces','serif']},colors:{pine:{50:'#effaf5',100:'#d6f1e4',600:'#0f7b57',700:'#0b6347',800:'#0a4e3a',900:'#07372a'},gold:{400:'#e8b341',500:'#d49a1c'}}}}}</script>
+<style>
+body{font-family:'Plus Jakarta Sans',sans-serif}
+.pattern{background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.12) 1px,transparent 0);background-size:22px 22px}
+#printArea{display:none}
+.cert{width:297mm;height:210mm;position:relative;background-size:100% 100%;background-color:#fff;page-break-after:always;overflow:hidden}
+.kartu{border:2px solid #0a4e3a;border-radius:12px;overflow:hidden;break-inside:avoid;background:#fff}
+@media print{body>*:not(#printArea){display:none!important}#printArea{display:block!important}@page{margin:8mm}}
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<div id="nav"></div>
+<main id="app"></main>
+<div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 p-4"></div>
+<div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[60] hidden rounded-xl bg-slate-900 px-4 py-2 text-sm text-white shadow-lg"></div>
+<div id="printArea"></div>
+
+<script>
+// ====== KONFIGURASI: tempel URL Web App Google Apps Script di sini ======
+const API = 'GANTI_DENGAN_URL_WEB_APP';
+
+const S = { pub: null, token: localStorage.getItem('akipa_t') || '', v: 'home', ap: 'dash' };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const I = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-pine-600 focus:outline-none focus:ring-2 focus:ring-pine-600/30';
+const BP = 'rounded-xl bg-pine-700 px-4 py-2 text-sm font-semibold text-white hover:bg-pine-800 disabled:opacity-50';
+const BS = 'rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100';
+const lbl = l => l ? [l.cabang, l.turunan].filter(Boolean).join(' - ') : '-';
+const fmtW = v => { if (!v) return '-'; const d = new Date(v); return isNaN(d) ? v : d.toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' }); };
+const uniq = a => [...new Set(a.filter(Boolean))].sort((x, y) => String(x).localeCompare(String(y), 'id', { numeric: true }));
+const opt = (a, sel, ph) => (ph !== undefined ? `<option value="">${ph}</option>` : '') + a.map(x => { const [v, t] = Array.isArray(x) ? x : [x, x]; return `<option value="${esc(v)}" ${v == sel ? 'selected' : ''}>${esc(t)}</option>`; }).join('');
+
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 3500); }
+async function api(action, d = {}) {
+  try {
+    const r = await fetch(API, { method: 'POST', body: JSON.stringify({ action, token: S.token, ...d }) });
+    const j = await r.json();
+    if (!j.ok) { if (j.err === 'AUTH') { S.token = ''; localStorage.removeItem('akipa_t'); go('login'); toast('Sesi berakhir, silakan login lagi.'); } else toast(j.err); return null; }
+    return j.data;
+  } catch (e) { toast('Tidak dapat terhubung ke server. Periksa URL API.'); return null; }
+}
+function modal(html) { const m = $('#modal'); if (!html) { m.classList.add('hidden'); m.classList.remove('flex'); return; } m.innerHTML = `<div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6 shadow-2xl">${html}</div>`; m.classList.remove('hidden'); m.classList.add('flex'); }
+function doPrint(html, land) { $('#printArea').innerHTML = html; let st = $('#pg'); if (!st) { st = document.createElement('style'); st.id = 'pg'; document.head.appendChild(st); } st.textContent = `@page{size:A4 ${land ? 'landscape' : 'portrait'};margin:${land ? 0 : '8mm'}}`; setTimeout(() => window.print(), 300); }
+
+// ====== NAVIGASI ======
+function nav() {
+  const L = (v, t) => `<button onclick="go('${v}')" class="rounded-lg px-3 py-1.5 text-sm font-medium ${S.v === v ? 'bg-white/20' : 'hover:bg-white/10'}">${t}</button>`;
+  $('#nav').innerHTML = `<header class="sticky top-0 z-40 bg-pine-900 text-white"><div class="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
+  <button onclick="go('home')" class="font-disp text-2xl font-extrabold tracking-wide">AKIPA</button>
+  <nav class="flex flex-wrap gap-1">${L('home', 'Beranda')}${L('lomba', 'Jenis Lomba')}${L('daftar', 'Daftar')}${L(S.token ? 'admin' : 'login', S.token ? 'Dashboard' : 'Login Panitia')}</nav></div></header>`;
+}
+function go(v) { S.v = v; nav(); window.scrollTo(0, 0); ({ home: vHome, lomba: vLomba, daftar: vDaftar, login: vLogin, admin: vAdmin })[v](); }
+async function loadPub() { const d = await api('pub'); if (d) S.pub = d; return !!d; }
+async function boot() { nav(); $('#app').innerHTML = '<p class="p-10 text-center text-slate-500">Memuat data...</p>'; if (!API.startsWith('http')) { $('#app').innerHTML = '<p class="p-10 text-center text-red-600">Isi konstanta API di index.html dengan URL Web App Apps Script.</p>'; return; } await loadPub(); go('home'); }
+
+// ====== PUBLIK ======
+function vHome() {
+  const ev = S.pub?.set?.event_name || 'Ajang Kompetisi Pesantren';
+  $('#app').innerHTML = `<section class="pattern bg-pine-800 text-white"><div class="mx-auto max-w-6xl px-4 py-16 md:py-24">
+  <p class="text-gold-400 font-semibold">${esc(ev)}</p>
+  <h1 class="font-disp mt-3 text-6xl font-extrabold md:text-8xl">AKIPA</h1>
+  <p class="mt-4 max-w-xl text-lg text-pine-100">Pilih cabang lomba, daftarkan santri dari markaz Anda, lalu cetak kartu peserta langsung dari halaman ini.</p>
+  <div class="mt-8 flex flex-wrap gap-3"><button onclick="go('daftar')" class="rounded-xl bg-gold-400 px-6 py-3 font-bold text-pine-900 hover:bg-gold-500">Daftar sekarang</button>
+  <button onclick="go('lomba')" class="rounded-xl border border-white/40 px-6 py-3 font-semibold hover:bg-white/10">Lihat jenis lomba</button></div></div></section>
+  <section class="mx-auto grid max-w-6xl gap-4 px-4 py-10 md:grid-cols-3">
+  ${[['Jenis Lomba', 'Cabang, waktu, dan tempat pelaksanaan tiap lomba.', 'lomba'], ['Pendaftaran Peserta', 'Individu maupun beregu, satu perwakilan bisa mendaftarkan seluruh anggota.', 'daftar'], ['Panitia', 'Kelola data siswa, lomba, peserta, kartu, dan sertifikat.', S.token ? 'admin' : 'login']].map(([t, d, v]) => `<button onclick="go('${v}')" class="rounded-2xl border border-slate-200 bg-white p-6 text-left hover:border-pine-600"><h3 class="font-bold text-pine-800">${t}</h3><p class="mt-2 text-sm text-slate-600">${d}</p></button>`).join('')}</section>`;
+}
+function vLomba() {
+  const L = S.pub.lomba, jn = uniq(L.map(x => x.jenis));
+  $('#app').innerHTML = `<div class="mx-auto max-w-6xl px-4 py-8"><h2 class="font-disp text-3xl font-bold text-pine-800">Jenis Lomba</h2>
+  ${jn.length ? jn.map(j => `<h3 class="mt-8 mb-3 text-lg font-bold">${esc(j)}</h3><div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">${L.filter(x => x.jenis === j).map(l => `<div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="flex items-start justify-between gap-2"><h4 class="font-semibold">${esc(lbl(l))}</h4><span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${l.status === 'Dilaksanakan' ? 'bg-pine-100 text-pine-800' : 'bg-amber-100 text-amber-800'}">${esc(l.status)}</span></div>
+  <p class="mt-2 text-sm text-slate-600">${esc(l.tipe)}${l.tipe === 'Beregu' && l.maks ? ' (maks. ' + esc(l.maks) + ' anggota)' : ''}</p><p class="text-sm text-slate-600">${esc(fmtW(l.waktu))}</p><p class="text-sm text-slate-600">${esc(l.tempat || '-')}</p></div>`).join('')}</div>`).join('') : '<p class="mt-6 text-slate-500">Jenis lomba belum diumumkan.</p>'}</div>`;
+}
+const D = { sel: new Map() };
+function vDaftar() {
+  D.sel.clear(); const P = S.pub, L = P.lomba.filter(x => x.status === 'Dilaksanakan');
+  $('#app').innerHTML = `<div class="mx-auto max-w-3xl px-4 py-8"><h2 class="font-disp text-3xl font-bold text-pine-800">Pendaftaran Peserta</h2>
+  <div class="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+  <div><label class="text-sm font-semibold">Cabang lomba</label><select id="dl" class="${I}" onchange="dInfo()">${opt(L.map(l => [l.id, l.jenis + ' / ' + lbl(l)]), '', 'Pilih cabang lomba')}</select><p id="di" class="mt-1 text-xs text-slate-500"></p></div>
+  <div><label class="text-sm font-semibold">Markaz</label><select id="dm" class="${I}" onchange="D.sel.clear();dFil()">${opt(P.markaz.map(m => m.nama), '', 'Pilih markaz')}</select></div>
+  <div class="grid gap-3 sm:grid-cols-2"><div><label class="text-sm font-semibold">Jenjang</label><select id="dj" class="${I}" onchange="dFil(1)"></select></div><div><label class="text-sm font-semibold">Kelas</label><select id="dk" class="${I}" onchange="dList()"></select></div></div>
+  <div><label class="text-sm font-semibold">Nama</label><input id="dq" class="${I}" placeholder="Cari nama..." oninput="dList()"><div id="dn" class="mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200"></div></div>
+  <div><p class="text-sm font-semibold">Terpilih</p><div id="dc" class="mt-1 flex flex-wrap gap-2"></div></div>
+  <button id="ds" class="${BP} w-full" onclick="dSend()">Kirim pendaftaran</button></div></div>`;
+  dFil(); dInfo();
+}
+function dInfo() { const l = S.pub.lomba.find(x => x.id == $('#dl').value); $('#di').textContent = l ? (l.tipe === 'Beregu' ? `Lomba beregu: pilih ${l.maks ? 'maksimal ' + l.maks : 'seluruh'} anggota tim, bisa dari beberapa kelas.` : 'Lomba individu: pilih satu peserta.') : ''; }
+function dBase() { const m = $('#dm').value; return S.pub.siswa.filter(s => s.markaz === m); }
+function dFil(keepJ) { const b = dBase(); if (!keepJ) $('#dj').innerHTML = opt(uniq(b.map(s => s.jenjang)), '', 'Semua jenjang'); const j = $('#dj').value; $('#dk').innerHTML = opt(uniq(b.filter(s => !j || s.jenjang === j).map(s => s.kelas)), '', 'Semua kelas'); dList(); }
+function dList() {
+  const j = $('#dj').value, k = $('#dk').value, q = $('#dq').value.toLowerCase();
+  const r = dBase().filter(s => (!j || s.jenjang === j) && (!k || s.kelas === k) && s.nama.toLowerCase().includes(q));
+  $('#dn').innerHTML = $('#dm').value ? (r.map(s => `<label class="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-3 py-2 text-sm hover:bg-pine-50"><input type="checkbox" ${D.sel.has(s.id) ? 'checked' : ''} onchange="dPick('${s.id}',this.checked)"> ${esc(s.nama)} <span class="ml-auto text-xs text-slate-400">${esc(s.jenjang)} ${esc(s.kelas)}</span></label>`).join('') || '<p class="p-3 text-sm text-slate-500">Tidak ada nama yang cocok.</p>') : '<p class="p-3 text-sm text-slate-500">Pilih markaz terlebih dahulu.</p>';
+  $('#dc').innerHTML = [...D.sel.values()].map(s => `<span class="rounded-full bg-pine-100 px-3 py-1 text-xs font-semibold text-pine-800">${esc(s.nama)}</span>`).join('') || '<span class="text-sm text-slate-400">Belum ada.</span>';
+}
+function dPick(id, on) { const l = S.pub.lomba.find(x => x.id == $('#dl').value); if (on) { if (l?.tipe !== 'Beregu') D.sel.clear(); D.sel.set(id, S.pub.siswa.find(s => s.id == id)); } else D.sel.delete(id); dList(); }
+async function dSend() {
+  const lid = $('#dl').value; if (!lid) return toast('Pilih cabang lomba.'); if (!D.sel.size) return toast('Pilih peserta.');
+  const b = $('#ds'); b.disabled = true; b.textContent = 'Mengirim...';
+  const r = await api('daftar', { lomba_id: lid, markaz: $('#dm').value, members: [...D.sel.values()].map(s => ({ siswa_id: s.id, nama: s.nama, jenjang: s.jenjang, kelas: s.kelas })) });
+  b.disabled = false; b.textContent = 'Kirim pendaftaran';
+  if (r) { const l = S.pub.lomba.find(x => x.id == lid); $('#app').innerHTML = `<div class="mx-auto max-w-3xl px-4 py-8"><div class="rounded-2xl bg-pine-100 p-5"><h2 class="font-disp text-2xl font-bold text-pine-800">Pendaftaran berhasil</h2><p class="mt-1 text-sm">Simpan atau cetak kartu peserta di bawah ini.</p><div class="mt-4 flex gap-2"><button class="${BP}" onclick='doPrint(window.__k,false)'>Cetak kartu</button><button class="${BS}" onclick="go('daftar')">Daftar lagi</button></div></div><div class="mt-5 grid gap-4 sm:grid-cols-2">${r.map(p => kartu(p, l)).join('')}</div></div>`; window.__k = `<div class="grid grid-cols-2 gap-3">${r.map(p => kartu(p, l)).join('')}</div>`; }
+}
+const kartu = (p, l) => `<div class="kartu"><div class="flex items-center justify-between bg-pine-800 px-4 py-2 text-white"><b class="font-disp text-xl">AKIPA</b><span class="text-xs">Kartu Peserta</span></div><div class="p-4 text-sm"><div class="font-disp text-2xl font-extrabold text-pine-800">${esc(p.no)}</div><div class="mt-1 text-base font-bold">${esc(p.nama)}</div><div>${esc(p.markaz)} | ${esc(p.jenjang)} ${esc(p.kelas)}</div><div class="mt-2 font-semibold">${esc(lbl(l))}</div>${p.tim ? `<div>Tim: ${esc(p.tim)}</div>` : ''}<div>${esc(fmtW(l?.waktu))}</div><div>${esc(l?.tempat || '')}</div></div></div>`;
+
+// ====== LOGIN ======
+function vLogin() { $('#app').innerHTML = `<div class="mx-auto max-w-sm px-4 py-16"><div class="rounded-2xl border border-slate-200 bg-white p-6"><h2 class="font-disp text-2xl font-bold text-pine-800">Login panitia</h2><input id="lp" type="password" class="${I} mt-4" placeholder="Password" onkeydown="if(event.key=='Enter')doLogin()"><button class="${BP} mt-3 w-full" onclick="doLogin()">Masuk</button></div></div>`; }
+async function doLogin() { const t = await api('login', { pass: $('#lp').value }); if (t) { S.token = t; localStorage.setItem('akipa_t', t); S.ap = 'dash'; go('admin'); } }
+function logout() { S.token = ''; localStorage.removeItem('akipa_t'); go('home'); }
+
+// ====== ADMIN ======
+const CFG = {
+  siswa: { t: 'Data Siswa', sheet: 'Siswa', f: [['nama', 'Nama'], ['markaz', 'Markaz', 'markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas']] },
+  markaz: { t: 'Nama Markaz', sheet: 'Markaz', f: [['nama', 'Nama markaz']] },
+  lomba: { t: 'Jenis & Cabang Lomba', sheet: 'Lomba', f: [['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['turunan', 'Turunan cabang'], ['tipe', 'Tipe', ['Individu', 'Beregu']], ['maks', 'Maks. anggota (beregu)', 'number'], ['waktu', 'Waktu', 'datetime-local'], ['tempat', 'Tempat']], def: { tipe: 'Individu', status: 'Dilaksanakan' } },
+  pj: { t: 'PJ Lomba', sheet: 'Lomba', noAdd: 1, noDel: 1, f: [['pj', 'Nama PJ'], ['kontak', 'Kontak PJ'], ['status', 'Status pelaksanaan', ['Dilaksanakan', 'Ditunda', 'Dibatalkan']]], show: ['cabang', 'turunan'] },
+  peserta: { t: 'Peserta Lomba', sheet: 'Peserta', noAdd: 1, f: [['status', 'Status', ['Terdaftar', 'Terverifikasi', 'Ditolak']], ['juara', 'Juara', ['', '1', '2', '3']]], show: ['no', 'nama', 'markaz', 'kelas', 'lomba_id'] }
+};
+const MENU = [['dash', 'Ringkasan'], ['siswa', '1. Data siswa'], ['lomba', '2. Lomba'], ['markaz', '3. Markaz'], ['peserta', '4. Peserta'], ['pj', '5. PJ lomba'], ['cetak', '6. Cetak & sertifikat']];
+const A = { rows: [], q: '', fl: '' };
+function vAdmin() {
+  $('#app').innerHTML = `<div class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row"><aside class="md:w-56 shrink-0"><div class="flex gap-1 overflow-auto md:flex-col">${MENU.map(([k, t]) => `<button onclick="S.ap='${k}';vAdmin()" class="whitespace-nowrap rounded-xl px-3 py-2 text-left text-sm font-semibold ${S.ap === k ? 'bg-pine-700 text-white' : 'bg-white hover:bg-pine-50'}">${t}</button>`).join('')}<button onclick="logout()" class="rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50">Keluar</button></div></aside><section id="ac" class="min-w-0 flex-1"></section></div>`;
+  S.ap === 'dash' ? aDash() : S.ap === 'cetak' ? aCetak() : aCrud(S.ap);
+}
+async function aDash() {
+  $('#ac').innerHTML = '<p class="text-slate-500">Memuat...</p>';
+  const [s, l, p] = await Promise.all([api('list', { sheet: 'Siswa' }), api('list', { sheet: 'Lomba' }), api('list', { sheet: 'Peserta' })]); if (!s) return;
+  $('#ac').innerHTML = `<h2 class="font-disp text-2xl font-bold text-pine-800">Ringkasan</h2><div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">${[['Siswa', s.length], ['Cabang lomba', l.length], ['Dilaksanakan', l.filter(x => x.status === 'Dilaksanakan').length], ['Peserta', p.length]].map(([t, n]) => `<div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="text-3xl font-extrabold text-pine-800">${n}</div><div class="text-sm text-slate-500">${t}</div></div>`).join('')}</div>`;
+}
+async function aCrud(k) {
+  const c = CFG[k]; $('#ac').innerHTML = '<p class="text-slate-500">Memuat...</p>';
+  const [r, lm, mk] = await Promise.all([api('list', { sheet: c.sheet }), api('list', { sheet: 'Lomba' }), api('list', { sheet: 'Markaz' })]); if (!r) return;
+  A.rows = r; A.lm = lm; A.mk = mk; A.q = ''; A.fl = ''; aTable(k);
+}
+function aTable(k) {
+  const c = CFG[k], cols = c.show || c.f.map(f => f[0]), LM = Object.fromEntries(A.lm.map(l => [l.id, l]));
+  const cell = (r, x) => x === 'lomba_id' ? lbl(LM[r.lomba_id]) : x === 'waktu' ? (r.waktu ? fmtW(r.waktu) : '-') : r[x];
+  let rs = A.rows.filter(r => (!A.q || JSON.stringify(Object.values(r)).toLowerCase().includes(A.q)) && (!A.fl || r.lomba_id === A.fl));
+  const heads = [...new Set([...cols, ...(k === 'lomba' ? [] : [])])];
+  $('#ac').innerHTML = `<div class="flex flex-wrap items-center gap-2"><h2 class="font-disp mr-auto text-2xl font-bold text-pine-800">${c.t}</h2>
+  ${k === 'peserta' ? `<select class="${I} !w-56" onchange="A.fl=this.value;aTable('peserta')">${opt(A.lm.map(l => [l.id, lbl(l)]), A.fl, 'Semua lomba')}</select>` : ''}
+  <input class="${I} !w-44" placeholder="Cari..." value="${esc(A.q)}" oninput="A.q=this.value.toLowerCase();aTable('${k}');this.focus()">
+  ${k === 'siswa' ? `<button class="${BS}" onclick="impModal()">Impor Excel</button><button class="${BS} !text-red-600" onclick="clearSiswa()">Kosongkan</button>` : ''}
+  ${c.noAdd ? '' : `<button class="${BP}" onclick="rowForm('${k}')">Tambah</button>`}</div>
+  <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table class="w-full text-left text-sm"><thead class="bg-pine-50 text-pine-800"><tr>${heads.map(h => `<th class="px-3 py-2 font-semibold capitalize">${h === 'lomba_id' ? 'lomba' : h}</th>`).join('')}${k === 'peserta' ? '<th class="px-3 py-2">Status / Juara</th>' : ''}<th></th></tr></thead><tbody>
+  ${rs.slice(0, 300).map(r => `<tr class="border-t border-slate-100">${heads.map(h => `<td class="px-3 py-2">${esc(cell(r, h))}</td>`).join('')}${k === 'peserta' ? `<td class="px-3 py-2">${esc(r.status)}${r.juara ? ' / Juara ' + esc(r.juara) : ''}</td>` : ''}<td class="whitespace-nowrap px-3 py-2 text-right"><button class="font-semibold text-pine-700" onclick="rowForm('${k}','${r.id}')">${k === 'pj' || k === 'peserta' ? 'Atur' : 'Ubah'}</button>${c.noDel ? '' : ` <button class="ml-2 font-semibold text-red-600" onclick="rowDel('${k}','${r.id}')">Hapus</button>`}</td></tr>`).join('') || `<tr><td class="p-4 text-slate-500" colspan="9">Belum ada data.</td></tr>`}</tbody></table></div>${rs.length > 300 ? '<p class="mt-2 text-xs text-slate-500">Menampilkan 300 data pertama, gunakan pencarian.</p>' : ''}`;
+}
+function rowForm(k, id) {
+  const c = CFG[k], r = A.rows.find(x => x.id === id) || { ...(c.def || {}) };
+  const fld = ([n, t, ty]) => { const v = r[n] ?? ''; let inp;
+    if (Array.isArray(ty)) inp = `<select name="${n}" class="${I}">${opt(ty, v)}</select>`;
+    else if (ty === 'markaz') inp = `<select name="${n}" class="${I}">${opt(A.mk.map(m => m.nama), v, 'Pilih markaz')}</select>`;
+    else inp = `<input name="${n}" type="${ty || 'text'}" value="${esc(v)}" class="${I}">`;
+    return `<div><label class="text-sm font-semibold">${t}</label>${inp}</div>`; };
+  modal(`<h3 class="font-disp text-xl font-bold text-pine-800">${id ? 'Ubah' : 'Tambah'} data</h3><form id="rf" class="mt-4 space-y-3">${c.f.map(fld).join('')}</form><div class="mt-5 flex justify-end gap-2"><button class="${BS}" onclick="modal()">Batal</button><button class="${BP}" onclick="rowSave('${k}','${id || ''}')">Simpan</button></div>`);
+}
+async function rowSave(k, id) {
+  const o = { ...(A.rows.find(x => x.id === id) || CFG[k].def || {}) }; new FormData($('#rf')).forEach((v, n) => o[n] = v);
+  if (id) o.id = id; else delete o.id;
+  if (await api('save', { sheet: CFG[k].sheet, row: o })) { modal(); toast('Tersimpan.'); aCrud(k); }
+}
+async function rowDel(k, id) { if (confirm('Hapus data ini?') && await api('del', { sheet: CFG[k].sheet, id })) { toast('Dihapus.'); aCrud(k); } }
+async function clearSiswa() { if (confirm('Hapus SEMUA data siswa?') && await api('clear', { sheet: 'Siswa' })) aCrud('siswa'); }
+function impModal() { modal(`<h3 class="font-disp text-xl font-bold text-pine-800">Impor data siswa</h3><p class="mt-2 text-sm text-slate-600">File Excel/CSV dengan kolom: <b>nama, markaz, jenjang, kelas</b>. Markaz baru otomatis ditambahkan.</p><input id="fx" type="file" accept=".xlsx,.xls,.csv" class="${I} mt-4"><div class="mt-5 flex justify-end gap-2"><button class="${BS}" onclick="modal()">Batal</button><button class="${BP}" onclick="impGo()">Impor</button></div>`); }
+async function impGo() {
+  const f = $('#fx').files[0]; if (!f) return toast('Pilih file dulu.');
+  const wb = XLSX.read(await f.arrayBuffer()), js = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+  const g = (r, k) => String(Object.entries(r).find(([n]) => n.trim().toLowerCase() === k)?.[1] ?? '').trim();
+  const rows = js.map(r => ({ nama: g(r, 'nama'), markaz: g(r, 'markaz'), jenjang: g(r, 'jenjang'), kelas: g(r, 'kelas') })).filter(r => r.nama);
+  if (!rows.length) return toast('Kolom nama tidak ditemukan.');
+  toast('Mengimpor ' + rows.length + ' data...');
+  for (let i = 0; i < rows.length; i += 500) if (await api('importSiswa', { rows: rows.slice(i, i + 500) }) === null) return;
+  modal(); toast('Impor selesai.'); aCrud('siswa');
+}
+
+// ====== CETAK & SERTIFIKAT ======
+async function aCetak() {
+  $('#ac').innerHTML = '<p class="text-slate-500">Memuat...</p>';
+  const [lm, ps, set] = await Promise.all([api('list', { sheet: 'Lomba' }), api('list', { sheet: 'Peserta' }), api('pub')]); if (!set) return;
+  A.lm = lm; A.ps = ps; A.set = set.set;
+  const s = A.set, v = (k, d = '') => esc(s[k] ?? d);
+  $('#ac').innerHTML = `<h2 class="font-disp text-2xl font-bold text-pine-800">Cetak kartu, daftar hadir & sertifikat</h2>
+  <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5"><label class="text-sm font-semibold">Pilih lomba</label><select id="cl" class="${I}">${opt(lm.map(l => [l.id, lbl(l)]), '', 'Semua lomba')}</select>
+  <div class="mt-3 flex flex-wrap gap-2"><button class="${BP}" onclick="pKartu()">Cetak kartu peserta</button><button class="${BP}" onclick="pHadir()">Cetak daftar hadir</button><button class="${BP}" onclick="pCert('ikut')">Sertifikat keikutsertaan</button><button class="${BP}" onclick="pCert('juara')">Sertifikat juara</button></div></div>
+  <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5"><h3 class="font-bold">Pengaturan sertifikat</h3>
+  <div class="mt-3 grid gap-3 md:grid-cols-2"><div class="md:col-span-2"><label class="text-sm font-semibold">Nama acara (tampil di kartu & beranda)</label><input id="s_event_name" class="${I}" value="${v('event_name')}"></div>
+  <div class="md:col-span-2"><label class="text-sm font-semibold">Desain sertifikat (gambar, rasio A4 landscape)</label><input id="cf" type="file" accept="image/*" class="${I}"><button class="${BS} mt-2" onclick="upCert()">Unggah desain</button>${s.cert_bg ? `<img src="${esc(s.cert_bg)}" class="mt-2 h-28 rounded-lg border">` : ''}</div>
+  <div><label class="text-sm font-semibold">Redaksi keikutsertaan</label><textarea id="s_cert_ikut" rows="5" class="${I}">${v('cert_ikut', 'Diberikan kepada\n{nama}\n{markaz}\nsebagai peserta lomba {lomba}')}</textarea></div>
+  <div><label class="text-sm font-semibold">Redaksi juara</label><textarea id="s_cert_juara" rows="5" class="${I}">${v('cert_juara', 'Diberikan kepada\n{nama}\n{markaz}\nsebagai Juara {juara}\nlomba {lomba}')}</textarea></div>
+  <div><label class="text-sm font-semibold">Posisi teks dari atas (%)</label><input id="s_cert_top" type="number" class="${I}" value="${v('cert_top', 38)}"></div>
+  <div><label class="text-sm font-semibold">Ukuran huruf (px)</label><input id="s_cert_size" type="number" class="${I}" value="${v('cert_size', 24)}"></div>
+  <div><label class="text-sm font-semibold">Warna teks</label><input id="s_cert_color" type="color" class="${I} !h-10" value="${v('cert_color', '#111111')}"></div></div>
+  <p class="mt-2 text-xs text-slate-500">Kode yang tersedia: {nama} {markaz} {kelas} {lomba} {juara}</p><button class="${BP} mt-3" onclick="saveSet()">Simpan pengaturan</button></div>`;
+}
+async function saveSet() { const kv = {}; document.querySelectorAll('[id^=s_]').forEach(e => kv[e.id.slice(2)] = e.value); if (await api('setting', { kv })) { toast('Pengaturan tersimpan.'); } }
+async function upCert() {
+  const f = $('#cf').files[0]; if (!f) return toast('Pilih gambar dulu.'); toast('Mengunggah...');
+  const data = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(f); });
+  const url = await api('upload', { data, mime: f.type, name: f.name }); if (url && await api('setting', { kv: { cert_bg: url } })) { toast('Desain terunggah.'); aCetak(); }
+}
+function selP() { const id = $('#cl').value, LM = Object.fromEntries(A.lm.map(l => [l.id, l])); return A.ps.filter(p => !id || p.lomba_id === id).map(p => [p, LM[p.lomba_id]]); }
+function pKartu() { const r = selP(); if (!r.length) return toast('Belum ada peserta.'); doPrint(`<div class="grid grid-cols-2 gap-3">${r.map(([p, l]) => kartu(p, l)).join('')}</div>`, false); }
+function pHadir() {
+  const r = selP(); if (!r.length) return toast('Belum ada peserta.');
+  const g = {}; r.forEach(([p, l]) => (g[p.lomba_id] ??= { l, a: [] }).a.push(p));
+  doPrint(Object.values(g).map(({ l, a }) => `<div style="page-break-after:always"><h2 style="font-size:18px;font-weight:700">Daftar Hadir - ${esc(lbl(l))}</h2><p style="font-size:12px;margin-bottom:8px">${esc(fmtW(l?.waktu))} | ${esc(l?.tempat || '')}</p><table style="width:100%;border-collapse:collapse;font-size:12px"><tr>${['No', 'No. Peserta', 'Nama', 'Markaz', 'Kelas', 'Tanda tangan'].map(h => `<th style="border:1px solid #333;padding:6px">${h}</th>`).join('')}</tr>${a.map((p, i) => `<tr><td style="border:1px solid #333;padding:8px">${i + 1}</td><td style="border:1px solid #333;padding:8px">${esc(p.no)}</td><td style="border:1px solid #333;padding:8px">${esc(p.nama)}</td><td style="border:1px solid #333;padding:8px">${esc(p.markaz)}</td><td style="border:1px solid #333;padding:8px">${esc(p.jenjang + ' ' + p.kelas)}</td><td style="border:1px solid #333;padding:8px;width:25%"></td></tr>`).join('')}</table></div>`).join(''), false);
+}
+function pCert(t) {
+  const s = A.set, r = selP().filter(([p]) => t === 'ikut' || p.juara); if (!r.length) return toast(t === 'juara' ? 'Belum ada peserta yang diberi juara.' : 'Belum ada peserta.');
+  if (!s.cert_bg) toast('Desain sertifikat belum diunggah, dicetak tanpa latar.');
+  const tpl = t === 'ikut' ? (s.cert_ikut || '{nama}') : (s.cert_juara || '{nama} Juara {juara}');
+  doPrint(r.map(([p, l]) => { const tx = tpl.replace(/{nama}/g, p.nama).replace(/{markaz}/g, p.markaz).replace(/{kelas}/g, p.kelas).replace(/{lomba}/g, lbl(l)).replace(/{juara}/g, p.juara); return `<div class="cert" style="background-image:url('${esc(s.cert_bg || '')}')"><div style="position:absolute;left:10%;width:80%;top:${+s.cert_top || 38}%;text-align:center;font-size:${+s.cert_size || 24}px;color:${esc(s.cert_color || '#111')};white-space:pre-line;line-height:1.5">${esc(tx)}</div></div>`; }).join(''), true);
+}
+boot();
+</script>
+</body>
+</html>
