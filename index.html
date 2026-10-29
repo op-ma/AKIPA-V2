@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AKIPA - Ajang Kreatifitas dan Intelektualitas Pesantren Al Ma'tuq</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>tailwind.config={theme:{extend:{fontFamily:{sans:['"Plus Jakarta Sans"','sans-serif'],disp:['Fraunces','serif']},colors:{pine:{50:'#effaf5',100:'#d6f1e4',600:'#0f7b57',700:'#0b6347',800:'#0a4e3a',900:'#07372a'},gold:{400:'#e8b341',500:'#d49a1c'}}}}}</script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['"Nunito Sans"','sans-serif'],disp:['Cinzel','serif']},colors:{pine:{50:'#eef4ff',100:'#dce8fb',600:'#1f55a8',700:'#16418a',800:'#0f2f69',900:'#0a2048'},gold:{400:'#e3b23c',500:'#c99a24'}}}}}</script>
 <style>
-body{font-family:'Plus Jakarta Sans',sans-serif}
-.pattern{background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.12) 1px,transparent 0);background-size:22px 22px}
+body{font-family:'Nunito Sans',sans-serif}
+.pattern{background-image:radial-gradient(circle at 1px 1px,rgba(227,178,60,.28) 1px,transparent 0),linear-gradient(135deg,#0a2048,#16418a);background-size:22px 22px,100% 100%}
 #printArea{display:none}
 .cert{width:297mm;height:210mm;position:relative;background-size:100% 100%;background-color:#fff;page-break-after:always;overflow:hidden}
-.kartu{border:2px solid #0a4e3a;border-radius:12px;overflow:hidden;break-inside:avoid;background:#fff}
+.kartu{border:2px solid #c99a24;border-radius:12px;overflow:hidden;break-inside:avoid;background:#fff}
 @media print{body>*:not(#printArea){display:none!important}#printArea{display:block!important}@page{margin:8mm}}
 </style>
 </head>
@@ -54,8 +54,8 @@ function doPrint(html, land) { $('#printArea').innerHTML = html; let st = $('#pg
 // ====== NAVIGASI ======
 function nav() {
   const L = (v, t) => `<button onclick="go('${v}')" class="rounded-lg px-3 py-1.5 text-sm font-medium ${S.v === v ? 'bg-white/20' : 'hover:bg-white/10'}">${t}</button>`;
-  $('#nav').innerHTML = `<header class="sticky top-0 z-40 bg-pine-900 text-white"><div class="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
-  <button onclick="go('home')" class="font-disp text-2xl font-extrabold tracking-wide">AKIPA</button>
+  $('#nav').innerHTML = `<header class="sticky top-0 z-40 border-b-2 border-gold-400 bg-pine-900 text-white"><div class="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
+  <button onclick="go('home')" class="font-disp text-2xl font-extrabold tracking-widest text-gold-400">AKIPA</button>
   <nav class="flex flex-wrap gap-1">${L('home', 'Beranda')}${L('lomba', 'Jenis Lomba')}${L('daftar', 'Daftar')}${L(S.token ? 'admin' : 'login', S.token ? 'Dashboard' : 'Login Panitia')}</nav></div></header>`;
 }
 function go(v) { S.v = v; nav(); window.scrollTo(0, 0); ({ home: vHome, lomba: vLomba, daftar: vDaftar, login: vLogin, admin: vAdmin })[v](); }
@@ -67,7 +67,7 @@ function vHome() {
   const ev = S.pub?.set?.event_name || 'Ajang Kompetisi Pesantren';
   $('#app').innerHTML = `<section class="pattern bg-pine-800 text-white"><div class="mx-auto max-w-6xl px-4 py-16 md:py-24">
   <p class="text-gold-400 font-semibold">${esc(ev)}</p>
-  <h1 class="font-disp mt-3 text-6xl font-extrabold md:text-8xl">AKIPA</h1>
+  <h1 class="font-disp mt-3 text-6xl font-extrabold tracking-widest text-gold-400 md:text-8xl">AKIPA</h1>
   <p class="mt-4 max-w-xl text-lg text-pine-100">Pilih cabang lomba, daftarkan santri dari markaz Anda, lalu cetak kartu peserta langsung dari halaman ini.</p>
   <div class="mt-8 flex flex-wrap gap-3"><button onclick="go('daftar')" class="rounded-xl bg-gold-400 px-6 py-3 font-bold text-pine-900 hover:bg-gold-500">Daftar sekarang</button>
   <button onclick="go('lomba')" class="rounded-xl border border-white/40 px-6 py-3 font-semibold hover:bg-white/10">Lihat jenis lomba</button></div></div></section>
@@ -110,7 +110,7 @@ async function dSend() {
   b.disabled = false; b.textContent = 'Kirim pendaftaran';
   if (r) { const l = S.pub.lomba.find(x => x.id == lid); $('#app').innerHTML = `<div class="mx-auto max-w-3xl px-4 py-8"><div class="rounded-2xl bg-pine-100 p-5"><h2 class="font-disp text-2xl font-bold text-pine-800">Pendaftaran berhasil</h2><p class="mt-1 text-sm">Simpan atau cetak kartu peserta di bawah ini.</p><div class="mt-4 flex gap-2"><button class="${BP}" onclick='doPrint(window.__k,false)'>Cetak kartu</button><button class="${BS}" onclick="go('daftar')">Daftar lagi</button></div></div><div class="mt-5 grid gap-4 sm:grid-cols-2">${r.map(p => kartu(p, l)).join('')}</div></div>`; window.__k = `<div class="grid grid-cols-2 gap-3">${r.map(p => kartu(p, l)).join('')}</div>`; }
 }
-const kartu = (p, l) => `<div class="kartu"><div class="flex items-center justify-between bg-pine-800 px-4 py-2 text-white"><b class="font-disp text-xl">AKIPA</b><span class="text-xs">Kartu Peserta</span></div><div class="p-4 text-sm"><div class="font-disp text-2xl font-extrabold text-pine-800">${esc(p.no)}</div><div class="mt-1 text-base font-bold">${esc(p.nama)}</div><div>${esc(p.markaz)} | ${esc(p.jenjang)} ${esc(p.kelas)}</div><div class="mt-2 font-semibold">${esc(lbl(l))}</div>${p.tim ? `<div>Tim: ${esc(p.tim)}</div>` : ''}<div>${esc(fmtW(l?.waktu))}</div><div>${esc(l?.tempat || '')}</div></div></div>`;
+const kartu = (p, l) => `<div class="kartu"><div class="flex items-center justify-between border-b-4 border-gold-400 bg-pine-800 px-4 py-2 text-white"><b class="font-disp text-xl text-gold-400">AKIPA</b><span class="text-xs">Kartu Peserta</span></div><div class="p-4 text-sm"><div class="font-disp text-2xl font-extrabold text-pine-800">${esc(p.no)}</div><div class="mt-1 text-base font-bold">${esc(p.nama)}</div><div>${esc(p.markaz)} | ${esc(p.jenjang)} ${esc(p.kelas)}</div><div class="text-xs text-slate-600">NISN ${esc(p.nisn || '-')}<br>${esc([p.tempat_lahir, p.tanggal_lahir].filter(Boolean).join(', ') || '-')}<br>${esc(p.kota || '-')}</div><div class="mt-2 font-semibold">${esc(lbl(l))}</div>${p.tim ? `<div>Tim: ${esc(p.tim)}</div>` : ''}<div>${esc(fmtW(l?.waktu))}</div><div>${esc(l?.tempat || '')}</div></div></div>`;
 
 // ====== LOGIN ======
 function vLogin() { $('#app').innerHTML = `<div class="mx-auto max-w-sm px-4 py-16"><div class="rounded-2xl border border-slate-200 bg-white p-6"><h2 class="font-disp text-2xl font-bold text-pine-800">Login panitia</h2><input id="lp" type="password" class="${I} mt-4" placeholder="Password" onkeydown="if(event.key=='Enter')doLogin()"><button class="${BP} mt-3 w-full" onclick="doLogin()">Masuk</button></div></div>`; }
@@ -119,7 +119,7 @@ function logout() { S.token = ''; localStorage.removeItem('akipa_t'); go('home')
 
 // ====== ADMIN ======
 const CFG = {
-  siswa: { t: 'Data Siswa', sheet: 'Siswa', f: [['nama', 'Nama'], ['markaz', 'Markaz', 'markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas']] },
+  siswa: { t: 'Data Siswa', sheet: 'Siswa', f: [['nama', 'Nama'], ['markaz', 'Markaz', 'markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas'], ['nisn', 'NISN'], ['tempat_lahir', 'Tempat lahir'], ['tanggal_lahir', 'Tanggal lahir (dd-mm-yyyy)'], ['kota', 'Kota asal']] },
   markaz: { t: 'Nama Markaz', sheet: 'Markaz', f: [['nama', 'Nama markaz']] },
   lomba: { t: 'Jenis & Cabang Lomba', sheet: 'Lomba', f: [['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['turunan', 'Turunan cabang'], ['tipe', 'Tipe', ['Individu', 'Beregu']], ['maks', 'Maks. anggota (beregu)', 'number'], ['waktu', 'Waktu', 'datetime-local'], ['tempat', 'Tempat']], def: { tipe: 'Individu', status: 'Dilaksanakan' } },
   pj: { t: 'PJ Lomba', sheet: 'Lomba', noAdd: 1, noDel: 1, f: [['pj', 'Nama PJ'], ['kontak', 'Kontak PJ'], ['status', 'Status pelaksanaan', ['Dilaksanakan', 'Ditunda', 'Dibatalkan']]], show: ['cabang', 'turunan'] },
@@ -170,12 +170,12 @@ async function rowSave(k, id) {
 }
 async function rowDel(k, id) { if (confirm('Hapus data ini?') && await api('del', { sheet: CFG[k].sheet, id })) { toast('Dihapus.'); aCrud(k); } }
 async function clearSiswa() { if (confirm('Hapus SEMUA data siswa?') && await api('clear', { sheet: 'Siswa' })) aCrud('siswa'); }
-function impModal() { modal(`<h3 class="font-disp text-xl font-bold text-pine-800">Impor data siswa</h3><p class="mt-2 text-sm text-slate-600">File Excel/CSV dengan kolom: <b>nama, markaz, jenjang, kelas</b>. Markaz baru otomatis ditambahkan.</p><input id="fx" type="file" accept=".xlsx,.xls,.csv" class="${I} mt-4"><div class="mt-5 flex justify-end gap-2"><button class="${BS}" onclick="modal()">Batal</button><button class="${BP}" onclick="impGo()">Impor</button></div>`); }
+function impModal() { modal(`<h3 class="font-disp text-xl font-bold text-pine-800">Impor data siswa</h3><p class="mt-2 text-sm text-slate-600">File Excel/CSV dengan kolom: <b>nama, markaz, jenjang, kelas, nisn, tempat_lahir, tanggal_lahir, kota</b>. Markaz baru otomatis ditambahkan.</p><input id="fx" type="file" accept=".xlsx,.xls,.csv" class="${I} mt-4"><div class="mt-5 flex justify-end gap-2"><button class="${BS}" onclick="modal()">Batal</button><button class="${BP}" onclick="impGo()">Impor</button></div>`); }
 async function impGo() {
   const f = $('#fx').files[0]; if (!f) return toast('Pilih file dulu.');
   const wb = XLSX.read(await f.arrayBuffer()), js = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
   const g = (r, k) => String(Object.entries(r).find(([n]) => n.trim().toLowerCase() === k)?.[1] ?? '').trim();
-  const rows = js.map(r => ({ nama: g(r, 'nama'), markaz: g(r, 'markaz'), jenjang: g(r, 'jenjang'), kelas: g(r, 'kelas') })).filter(r => r.nama);
+  const rows = js.map(r => ({ nama: g(r, 'nama'), markaz: g(r, 'markaz'), jenjang: g(r, 'jenjang'), kelas: g(r, 'kelas'), nisn: g(r, 'nisn'), tempat_lahir: g(r, 'tempat_lahir'), tanggal_lahir: g(r, 'tanggal_lahir'), kota: g(r, 'kota') })).filter(r => r.nama);
   if (!rows.length) return toast('Kolom nama tidak ditemukan.');
   toast('Mengimpor ' + rows.length + ' data...');
   for (let i = 0; i < rows.length; i += 500) if (await api('importSiswa', { rows: rows.slice(i, i + 500) }) === null) return;
@@ -199,7 +199,7 @@ async function aCetak() {
   <div><label class="text-sm font-semibold">Posisi teks dari atas (%)</label><input id="s_cert_top" type="number" class="${I}" value="${v('cert_top', 38)}"></div>
   <div><label class="text-sm font-semibold">Ukuran huruf (px)</label><input id="s_cert_size" type="number" class="${I}" value="${v('cert_size', 24)}"></div>
   <div><label class="text-sm font-semibold">Warna teks</label><input id="s_cert_color" type="color" class="${I} !h-10" value="${v('cert_color', '#111111')}"></div></div>
-  <p class="mt-2 text-xs text-slate-500">Kode yang tersedia: {nama} {markaz} {kelas} {lomba} {juara}</p><button class="${BP} mt-3" onclick="saveSet()">Simpan pengaturan</button></div>`;
+  <p class="mt-2 text-xs text-slate-500">Kode yang tersedia: {nama} {markaz} {kelas} {nisn} {ttl} {kota} {lomba} {juara}</p><button class="${BP} mt-3" onclick="saveSet()">Simpan pengaturan</button></div>`;
 }
 async function saveSet() { const kv = {}; document.querySelectorAll('[id^=s_]').forEach(e => kv[e.id.slice(2)] = e.value); if (await api('setting', { kv })) { toast('Pengaturan tersimpan.'); } }
 async function upCert() {
@@ -218,7 +218,7 @@ function pCert(t) {
   const s = A.set, r = selP().filter(([p]) => t === 'ikut' || p.juara); if (!r.length) return toast(t === 'juara' ? 'Belum ada peserta yang diberi juara.' : 'Belum ada peserta.');
   if (!s.cert_bg) toast('Desain sertifikat belum diunggah, dicetak tanpa latar.');
   const tpl = t === 'ikut' ? (s.cert_ikut || '{nama}') : (s.cert_juara || '{nama} Juara {juara}');
-  doPrint(r.map(([p, l]) => { const tx = tpl.replace(/{nama}/g, p.nama).replace(/{markaz}/g, p.markaz).replace(/{kelas}/g, p.kelas).replace(/{lomba}/g, lbl(l)).replace(/{juara}/g, p.juara); return `<div class="cert" style="background-image:url('${esc(s.cert_bg || '')}')"><div style="position:absolute;left:10%;width:80%;top:${+s.cert_top || 38}%;text-align:center;font-size:${+s.cert_size || 24}px;color:${esc(s.cert_color || '#111')};white-space:pre-line;line-height:1.5">${esc(tx)}</div></div>`; }).join(''), true);
+  doPrint(r.map(([p, l]) => { const tx = tpl.replace(/{nama}/g, p.nama).replace(/{markaz}/g, p.markaz).replace(/{kelas}/g, p.kelas).replace(/{nisn}/g, p.nisn).replace(/{ttl}/g, [p.tempat_lahir, p.tanggal_lahir].filter(Boolean).join(', ')).replace(/{kota}/g, p.kota).replace(/{lomba}/g, lbl(l)).replace(/{juara}/g, p.juara); return `<div class="cert" style="background-image:url('${esc(s.cert_bg || '')}')"><div style="position:absolute;left:10%;width:80%;top:${+s.cert_top || 38}%;text-align:center;font-size:${+s.cert_size || 24}px;color:${esc(s.cert_color || '#111')};white-space:pre-line;line-height:1.5">${esc(tx)}</div></div>`; }).join(''), true);
 }
 boot();
 </script>
