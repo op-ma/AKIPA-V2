@@ -194,6 +194,7 @@ function aTable(k) {
   ${k === 'peserta' ? `<select class="${I} !w-56" onchange="A.fl=this.value;aBody('peserta')">${opt(A.lm.map(l => [l.id, lbl(l)]), A.fl, 'Semua lomba')}</select>` : ''}
   <input class="${I} !w-44" placeholder="Cari..." value="${esc(A.q)}" oninput="A.q=this.value.toLowerCase();clearTimeout(A.t);A.t=setTimeout(()=>aBody('${k}'),150)">
   <button title="Muat ulang" aria-label="Muat ulang" class="${BS} !px-2.5" onclick="aCrud('${k}',1)">${IC.refresh}</button>
+  ${k === 'peserta' ? `<button class="${BS}" onclick="expPeserta()">Export peserta</button><button class="${BS}" onclick="expPeserta(1)">Export juara</button>` : ''}
   ${k === 'siswa' ? `<button class="${BS}" onclick="impModal()">Impor Excel</button><button class="${BS} !text-red-600" onclick="clearSiswa()">Kosongkan</button>` : ''}
   ${c.noAdd ? '' : `<button class="${BP}" onclick="rowForm('${k}')">Tambah</button>`}</div>
   <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table class="w-full text-left text-sm"><thead class="bg-pine-50 text-pine-800"><tr>${cols.map(h => `<th class="px-3 py-2 font-semibold capitalize">${HL[h] || h}</th>`).join('')}${k === 'peserta' ? '<th class="px-3 py-2">Status / Juara</th>' : ''}<th class="w-24"></th></tr></thead><tbody id="tb"></tbody></table></div><p id="tn" class="mt-2 text-xs text-slate-500"></p>`;
@@ -292,7 +293,7 @@ async function pjDelPeserta(id) {
 function pjJuara() {
   const L = PJD.lomba; if (!L.some(l => l.id === A.pl)) A.pl = L[0]?.id;
   const ps = PJD.peserta.filter(x => x.lomba_id === A.pl).sort((a, b) => (a.tim || '').localeCompare(b.tim || '') || a.nama.localeCompare(b.nama));
-  $('#ac').innerHTML = `<div class="flex flex-wrap items-center gap-2"><h2 class="font-disp mr-auto text-2xl font-bold text-pine-800">Juara lomba</h2><select class="${I} !w-64" onchange="A.pl=this.value;pjJuara()">${opt(L.map(l => [l.id, lbl(l)]), A.pl)}</select>${RF}</div>
+  $('#ac').innerHTML = `<div class="flex flex-wrap items-center gap-2"><h2 class="font-disp mr-auto text-2xl font-bold text-pine-800">Juara lomba</h2><select class="${I} !w-64" onchange="A.pl=this.value;pjJuara()">${opt(L.map(l => [l.id, lbl(l)]), A.pl)}</select><button class="${BS}" onclick="pjExport()">Export peserta</button><button class="${BS}" onclick="pjExport(1)">Export juara</button>${RF}</div>
   <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table class="w-full text-left text-sm"><thead class="bg-pine-50 text-pine-800"><tr><th class="px-3 py-2">No. peserta</th><th class="px-3 py-2">Nama</th><th class="px-3 py-2">Tim</th><th class="px-3 py-2">Markaz</th><th class="px-3 py-2">Kelas</th><th class="px-3 py-2">Juara</th><th class="w-12"></th></tr></thead><tbody>${ps.map(x => `<tr class="border-t border-slate-100"><td class="px-3 py-2">${esc(x.no)}</td><td class="px-3 py-2">${esc(x.nama)}</td><td class="px-3 py-2">${esc(x.tim || '-')}</td><td class="px-3 py-2">${esc(x.markaz)}</td><td class="px-3 py-2">${esc(x.jenjang + ' ' + x.kelas)}</td><td class="px-3 py-2"><select class="${I} !w-36" ${x.status === 'Ditolak' ? 'disabled' : ''} onchange="pjSetJuara('${x.id}',this.value)">${opt([['', 'Belum ada'], ['1', 'Juara 1'], ['2', 'Juara 2'], ['3', 'Juara 3']], x.juara)}</select></td><td class="px-3 py-2 text-right"><button title="Hapus" aria-label="Hapus" class="rounded-lg p-1.5 text-red-600 hover:bg-red-50" onclick="pjDelPeserta('${x.id}')">${IC.del}</button></td></tr>`).join('') || '<tr><td class="p-4 text-slate-500" colspan="7">Belum ada peserta terdaftar.</td></tr>'}</tbody></table></div><p class="mt-2 text-xs text-slate-500">Pada lomba beregu, juara otomatis berlaku untuk seluruh anggota tim.</p>`;
 }
 async function pjSetJuara(id, v) {
@@ -302,6 +303,39 @@ async function pjSetJuara(id, v) {
 }
 
 // ====== CETAK & SERTIFIKAT ======
+// ---- Export Excel (.xlsx) ----
+function xlsExport(nama, cols, data) {
+  if (!data.length) return toast('Tidak ada data untuk diekspor.');
+  const aoa = [cols.map(c => c[1]), ...data.map(r => cols.map(c => r[c[0]] ?? ''))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = cols.map((c, i) => ({ wch: Math.min(40, Math.max(...aoa.slice(0, 200).map(r => String(r[i] ?? '').length)) + 2) }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Data');
+  XLSX.writeFile(wb, nama + '-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  toast('File ' + data.length + ' baris diunduh.');
+}
+// juara=1 -> hanya peserta juara 1-3, diurutkan per lomba lalu peringkat
+function expRows(ps, LM, juara) {
+  let r = ps.map(x => ({ ...x, jenis: (LM[x.lomba_id] || {}).jenis || '', cabang: lbl(LM[x.lomba_id]), tim: x.tim || '' }));
+  if (juara) r = r.filter(x => ['1', '2', '3'].includes(String(x.juara))).sort((a, b) => a.jenis.localeCompare(b.jenis) || a.cabang.localeCompare(b.cabang) || String(a.juara).localeCompare(String(b.juara)) || a.nama.localeCompare(b.nama));
+  else r.sort((a, b) => a.jenis.localeCompare(b.jenis) || a.cabang.localeCompare(b.cabang) || String(a.no).localeCompare(String(b.no)));
+  return r;
+}
+function expPeserta(juara) {
+  const LM = Object.fromEntries(A.lm.map(l => [l.id, l]));
+  const ps = A.rows.filter(r => (!A.q || Object.values(r).join(' ').toLowerCase().includes(A.q)) && (!A.fl || r.lomba_id === A.fl));
+  const d = expRows(ps, LM, juara);
+  if (juara && !d.length) return toast('Belum ada peserta juara.');
+  xlsExport(juara ? 'juara-lomba' : 'peserta-lomba', juara
+    ? [['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['juara', 'Juara'], ['nama', 'Nama'], ['tim', 'Tim'], ['markaz', 'Markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas'], ['nisn', 'NISN'], ['no', 'No. peserta']]
+    : [['no', 'No. peserta'], ['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['tim', 'Tim'], ['nama', 'Nama'], ['nisn', 'NISN'], ['markaz', 'Markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas'], ['tempat_lahir', 'Tempat lahir'], ['tanggal_lahir', 'Tanggal lahir'], ['kota', 'Kota asal'], ['status', 'Status'], ['juara', 'Juara'], ['waktu_daftar', 'Waktu daftar']], d);
+}
+function pjExport(juara) {
+  const LM = Object.fromEntries(PJD.lomba.map(l => [l.id, l])), d = expRows(PJD.peserta, LM, juara);
+  if (juara && !d.length) return toast('Belum ada peserta juara.');
+  xlsExport(juara ? 'juara-lomba' : 'peserta-lomba', juara
+    ? [['cabang', 'Cabang lomba'], ['juara', 'Juara'], ['nama', 'Nama'], ['tim', 'Tim'], ['markaz', 'Markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas'], ['no', 'No. peserta']]
+    : [['no', 'No. peserta'], ['cabang', 'Cabang lomba'], ['tim', 'Tim'], ['nama', 'Nama'], ['markaz', 'Markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas'], ['status', 'Status'], ['juara', 'Juara']], d);
+}
 async function aCetak() {
   $('#ac').innerHTML = SPIN;
   if (!await getL(['Siswa', 'Markaz', 'Lomba', 'Peserta', 'PJ', 'Setting'], ['Peserta'])) return;
