@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AKIPA - Ajang Kreatifitas dan Intelektualitas Pesantren Al Ma'tuq</title>
+<title>AKIPA - Ajang Kreativitas dan Intelektualitas Pesantren Al Ma'tuq</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -82,27 +82,33 @@ function vLomba() {
 }
 const D = { sel: new Map() };
 function vDaftar() {
-  D.sel.clear(); const P = S.pub, L = P.lomba.filter(x => x.status === 'Dilaksanakan');
+  D.sel.clear(); D.found = null; const P = S.pub, L = P.lomba.filter(x => x.status === 'Dilaksanakan');
   $('#app').innerHTML = `<div class="mx-auto max-w-3xl px-4 py-8"><h2 class="font-disp text-3xl font-bold text-pine-800">Pendaftaran Peserta</h2>
   <div class="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
   <div><label class="text-sm font-semibold">Cabang lomba</label><select id="dl" class="${I}" onchange="dInfo()">${opt(L.map(l => [l.id, l.jenis + ' / ' + lbl(l)]), '', 'Pilih cabang lomba')}</select><p id="di" class="mt-1 text-xs text-slate-500"></p></div>
   <div><label class="text-sm font-semibold">Markaz</label><select id="dm" class="${I}" onchange="D.sel.clear();dFil()">${opt(P.markaz.map(m => m.nama), '', 'Pilih markaz')}</select></div>
-  <div class="grid gap-3 sm:grid-cols-2"><div><label class="text-sm font-semibold">Jenjang</label><select id="dj" class="${I}" onchange="dFil(1)"></select></div><div><label class="text-sm font-semibold">Kelas</label><select id="dk" class="${I}" onchange="dList()"></select></div></div>
-  <div><label class="text-sm font-semibold">Nama</label><input id="dq" class="${I}" placeholder="Cari nama..." oninput="dList()"><div id="dn" class="mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200"></div></div>
-  <div><p class="text-sm font-semibold">Terpilih</p><div id="dc" class="mt-1 flex flex-wrap gap-2"></div></div>
+  <div class="grid gap-3 sm:grid-cols-2"><div><label class="text-sm font-semibold">Jenjang</label><select id="dj" class="${I}" onchange="dFil(1)"></select></div><div><label class="text-sm font-semibold">Kelas</label><select id="dk" class="${I}" onchange="dReset()"></select></div></div>
+  <div><label class="text-sm font-semibold">NISN</label><div class="flex gap-2"><input id="dq" inputmode="numeric" class="${I}" placeholder="Masukkan NISN siswa" oninput="dReset(1)" onkeydown="if(event.key=='Enter')dCari()"><button class="${BP} shrink-0" onclick="dCari()">Cari</button></div><p class="mt-1 text-xs text-slate-500">Data siswa tampil setelah NISN yang sesuai dengan markaz, jenjang, dan kelas dimasukkan.</p><div id="dr" class="mt-2"></div></div>
+  <div><p class="text-sm font-semibold">Peserta terpilih</p><div id="dc" class="mt-1 flex flex-wrap gap-2"></div></div>
   <button id="ds" class="${BP} w-full" onclick="dSend()">Kirim pendaftaran</button></div></div>`;
   dFil(); dInfo();
 }
-function dInfo() { const l = S.pub.lomba.find(x => x.id == $('#dl').value); $('#di').textContent = l ? (l.tipe === 'Beregu' ? `Lomba beregu: pilih ${l.maks ? 'maksimal ' + l.maks : 'seluruh'} anggota tim, bisa dari beberapa kelas.` : 'Lomba individu: pilih satu peserta.') : ''; }
-function dBase() { const m = $('#dm').value; return S.pub.siswa.filter(s => s.markaz === m); }
-function dFil(keepJ) { const b = dBase(); if (!keepJ) $('#dj').innerHTML = opt(uniq(b.map(s => s.jenjang)), '', 'Semua jenjang'); const j = $('#dj').value; $('#dk').innerHTML = opt(uniq(b.filter(s => !j || s.jenjang === j).map(s => s.kelas)), '', 'Semua kelas'); dList(); }
-function dList() {
-  const j = $('#dj').value, k = $('#dk').value, q = $('#dq').value.toLowerCase();
-  const r = dBase().filter(s => (!j || s.jenjang === j) && (!k || s.kelas === k) && s.nama.toLowerCase().includes(q));
-  $('#dn').innerHTML = $('#dm').value ? (r.map(s => `<label class="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-3 py-2 text-sm hover:bg-pine-50"><input type="checkbox" ${D.sel.has(s.id) ? 'checked' : ''} onchange="dPick('${s.id}',this.checked)"> ${esc(s.nama)} <span class="ml-auto text-xs text-slate-400">${esc(s.jenjang)} ${esc(s.kelas)}</span></label>`).join('') || '<p class="p-3 text-sm text-slate-500">Tidak ada nama yang cocok.</p>') : '<p class="p-3 text-sm text-slate-500">Pilih markaz terlebih dahulu.</p>';
-  $('#dc').innerHTML = [...D.sel.values()].map(s => `<span class="rounded-full bg-pine-100 px-3 py-1 text-xs font-semibold text-pine-800">${esc(s.nama)}</span>`).join('') || '<span class="text-sm text-slate-400">Belum ada.</span>';
+function dInfo() { const l = S.pub.lomba.find(x => x.id == $('#dl').value); $('#di').textContent = l ? (l.tipe === 'Beregu' ? `Lomba beregu: tambahkan ${l.maks ? 'maksimal ' + l.maks : 'seluruh'} anggota tim satu per satu dengan NISN masing-masing.` : 'Lomba individu: satu peserta.') : ''; }
+function dFil(keepJ) {
+  const K = S.pub.kelas.filter(x => x.markaz === $('#dm').value);
+  if (!keepJ) $('#dj').innerHTML = opt(uniq(K.map(x => x.jenjang)), '', 'Pilih jenjang');
+  const j = $('#dj').value; $('#dk').innerHTML = opt(uniq(K.filter(x => x.jenjang === j).map(x => x.kelas)), '', 'Pilih kelas'); dReset();
 }
-function dPick(id, on) { const l = S.pub.lomba.find(x => x.id == $('#dl').value); if (on) { if (l?.tipe !== 'Beregu') D.sel.clear(); D.sel.set(id, S.pub.siswa.find(s => s.id == id)); } else D.sel.delete(id); dList(); }
+function dReset(keepQ) { D.found = null; $('#dr').innerHTML = ''; if (!keepQ) $('#dq').value = ''; dChips(); }
+function dChips() { $('#dc').innerHTML = [...D.sel.values()].map(s => `<span class="flex items-center gap-2 rounded-full bg-pine-100 px-3 py-1 text-xs font-semibold text-pine-800">${esc(s.nama)} (${esc(s.jenjang)} ${esc(s.kelas)})<button class="text-red-600" onclick="D.sel.delete('${s.id}');dChips()" title="Hapus">&times;</button></span>`).join('') || '<span class="text-sm text-slate-400">Belum ada.</span>'; }
+async function dCari() {
+  const m = $('#dm').value, j = $('#dj').value, k = $('#dk').value, n = $('#dq').value.trim();
+  if (!m || !j || !k) return toast('Pilih markaz, jenjang, dan kelas terlebih dahulu.'); if (!n) return toast('Masukkan NISN.');
+  const s = await api('cari', { nisn: n, markaz: m, jenjang: j, kelas: k });
+  if (!s) { $('#dr').innerHTML = ''; return; } D.found = s;
+  $('#dr').innerHTML = `<div class="flex items-center justify-between gap-3 rounded-xl border border-pine-600/30 bg-pine-50 p-3"><div><div class="font-bold">${esc(s.nama)}</div><div class="text-xs text-slate-600">${esc(s.markaz)} | ${esc(s.jenjang)} ${esc(s.kelas)}</div></div><button class="${BP}" onclick="dAdd()">Tambahkan</button></div>`;
+}
+function dAdd() { const l = S.pub.lomba.find(x => x.id == $('#dl').value); if (!D.found) return; if (l?.tipe !== 'Beregu') D.sel.clear(); D.sel.set(D.found.id, D.found); dReset(); }
 async function dSend() {
   const lid = $('#dl').value; if (!lid) return toast('Pilih cabang lomba.'); if (!D.sel.size) return toast('Pilih peserta.');
   const b = $('#ds'); b.disabled = true; b.textContent = 'Mengirim...';
