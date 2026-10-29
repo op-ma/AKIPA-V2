@@ -41,7 +41,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const I = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-pine-600 focus:outline-none focus:ring-2 focus:ring-pine-600/30';
 const BP = 'rounded-xl bg-pine-700 px-4 py-2 text-sm font-semibold text-white hover:bg-pine-800 disabled:opacity-50';
 const BS = 'rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100';
-const lbl = l => l ? [l.cabang, l.turunan].filter(Boolean).join(' - ') : '-';
+const lbl = l => l ? [l.cabang, l.turunan, l.jenjang].filter(Boolean).join(' - ') : '-';
+const nj = v => String(v || '').trim().toLowerCase();
 const fmtW = v => { if (!v) return '-'; const d = new Date(v); return isNaN(d) ? v : d.toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' }); };
 const uniq = a => [...new Set(a.filter(Boolean))].sort((x, y) => String(x).localeCompare(String(y), 'id', { numeric: true }));
 const opt = (a, sel, ph) => (ph !== undefined ? `<option value="">${ph}</option>` : '') + a.map(x => { const [v, t] = Array.isArray(x) ? x : [x, x]; return `<option value="${esc(v)}" ${v == sel ? 'selected' : ''}>${esc(t)}</option>`; }).join('');
@@ -93,12 +94,12 @@ function vLomba() {
 }
 const D = { sel: new Map() };
 function vDaftar() {
-  D.sel.clear(); D.found = null; const P = S.pub, L = P.lomba.filter(x => x.status === 'Dilaksanakan');
+  D.sel.clear(); D.found = null; const P = S.pub;
   $('#app').innerHTML = `<div class="mx-auto max-w-3xl px-4 py-8"><h2 class="font-disp text-3xl font-bold text-pine-800">Pendaftaran Peserta</h2>
   <div class="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-  <div><label class="text-sm font-semibold">Cabang lomba</label><select id="dl" class="${I}" onchange="dInfo()">${opt(L.map(l => [l.id, l.jenis + ' / ' + lbl(l)]), '', 'Pilih cabang lomba')}</select><p id="di" class="mt-1 text-xs text-slate-500"></p></div>
-  <div><label class="text-sm font-semibold">Markaz</label><select id="dm" class="${I}" onchange="D.sel.clear();dFil()">${opt(P.markaz.map(m => m.nama), '', 'Pilih markaz')}</select></div>
-  <div class="grid gap-3 sm:grid-cols-2"><div><label class="text-sm font-semibold">Jenjang</label><select id="dj" class="${I}" onchange="dFil(1)"></select></div><div><label class="text-sm font-semibold">Kelas</label><select id="dk" class="${I}" onchange="dReset()"></select></div></div>
+  <div class="grid gap-3 sm:grid-cols-2"><div><label class="text-sm font-semibold">Markaz</label><select id="dm" class="${I}" onchange="D.sel.clear();dFil()">${opt(P.markaz.map(m => m.nama), '', 'Pilih markaz')}</select></div><div><label class="text-sm font-semibold">Jenjang</label><select id="dj" class="${I}" onchange="D.sel.clear();dFil(1)"></select></div></div>
+  <div><label class="text-sm font-semibold">Cabang lomba</label><select id="dl" class="${I}" onchange="dInfo()"></select><p id="di" class="mt-1 text-xs text-slate-500"></p></div>
+  <div><label class="text-sm font-semibold">Kelas</label><select id="dk" class="${I}" onchange="dReset()"></select></div>
   <div><label class="text-sm font-semibold">NISN</label><div class="flex gap-2"><input id="dq" inputmode="numeric" class="${I}" placeholder="Masukkan NISN siswa" oninput="dReset(1)" onkeydown="if(event.key=='Enter')dCari()"><button class="${BP} shrink-0" onclick="dCari()">Cari</button></div><p class="mt-1 text-xs text-slate-500">Data siswa tampil setelah NISN yang sesuai dengan markaz, jenjang, dan kelas dimasukkan.</p><div id="dr" class="mt-2"></div></div>
   <div><p class="text-sm font-semibold">Peserta terpilih</p><div id="dc" class="mt-1 flex flex-wrap gap-2"></div></div>
   <button id="ds" class="${BP} w-full" onclick="dSend()">Kirim pendaftaran</button></div></div>`;
@@ -108,7 +109,13 @@ function dInfo() { const l = S.pub.lomba.find(x => x.id == $('#dl').value); $('#
 function dFil(keepJ) {
   const K = S.pub.kelas.filter(x => x.markaz === $('#dm').value);
   if (!keepJ) $('#dj').innerHTML = opt(uniq(K.map(x => x.jenjang)), '', 'Pilih jenjang');
-  const j = $('#dj').value; $('#dk').innerHTML = opt(uniq(K.filter(x => x.jenjang === j).map(x => x.kelas)), '', 'Pilih kelas'); dReset();
+  const j = $('#dj').value; $('#dk').innerHTML = opt(uniq(K.filter(x => x.jenjang === j).map(x => x.kelas)), '', 'Pilih kelas'); dLomba(); dReset();
+}
+// Cabang lomba hanya yang dibuka untuk jenjang terpilih (lomba tanpa jenjang = semua jenjang).
+function dLomba() {
+  const j = $('#dj').value, L = S.pub.lomba.filter(x => x.status === 'Dilaksanakan' && (!x.jenjang || nj(x.jenjang) === nj(j)));
+  $('#dl').innerHTML = !j ? opt([], '', 'Pilih jenjang terlebih dahulu') : opt(L.map(l => [l.id, l.jenis + ' / ' + [l.cabang, l.turunan].filter(Boolean).join(' - ')]), '', L.length ? 'Pilih cabang lomba' : 'Belum ada lomba untuk jenjang ini');
+  dInfo();
 }
 function dReset(keepQ) { D.found = null; $('#dr').innerHTML = ''; if (!keepQ) $('#dq').value = ''; dChips(); }
 function dChips() { $('#dc').innerHTML = [...D.sel.values()].map(s => `<span class="flex items-center gap-2 rounded-full bg-pine-100 px-3 py-1 text-xs font-semibold text-pine-800">${esc(s.nama)} (${esc(s.jenjang)} ${esc(s.kelas)})<button class="text-red-600" onclick="D.sel.delete('${s.id}');dChips()" title="Hapus">&times;</button></span>`).join('') || '<span class="text-sm text-slate-400">Belum ada.</span>'; }
@@ -137,15 +144,15 @@ function vLogin() {
   <input id="lp" type="password" class="${I} mt-3" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key=='Enter')doLogin()">
   <button class="${BP} mt-3 w-full" onclick="doLogin()">Masuk</button></div></div>`;
 }
-async function doLogin() { const d = await api('login', { role: $('#lr').value, user: $('#lu').value, pass: $('#lp').value }); if (d) { setSess(d); S.ap = d.role === 'pj' ? 'pl' : 'dash'; go('admin'); } }
+async function doLogin() { const d = await api('login', { role: $('#lr').value, user: $('#lu').value, pass: $('#lp').value }); if (d && !d.token) return toast('Backend belum diperbarui: deploy ulang Code.gs terbaru di Apps Script (Manage deployments > Edit > New version).'); if (d) { setSess(d); S.ap = d.role === 'pj' ? 'pl' : 'dash'; go('admin'); } }
 function logout() { clearSess(); go('home'); }
 
 // ====== ADMIN ======
 const CFG = {
   siswa: { t: 'Data Siswa', sheet: 'Siswa', f: [['nama', 'Nama'], ['markaz', 'Markaz', 'markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas'], ['nisn', 'NISN'], ['tempat_lahir', 'Tempat lahir'], ['tanggal_lahir', 'Tanggal lahir (dd-mm-yyyy)'], ['kota', 'Kota asal']] },
   markaz: { t: 'Nama Markaz', sheet: 'Markaz', f: [['nama', 'Nama markaz']] },
-  lomba: { t: 'Jenis & Cabang Lomba', sheet: 'Lomba', f: [['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['turunan', 'Kategori lomba', ['Ikhwan', 'Akhwat']], ['tipe', 'Tipe', ['Individu', 'Beregu']], ['maks', 'Maks. anggota (beregu)', 'number'], ['waktu', 'Waktu', 'datetime-local'], ['tempat', 'Tempat']], def: { tipe: 'Individu', status: 'Dilaksanakan', turunan: 'Ikhwan' } },
-  pj: { t: 'Status & PJ Lomba', sheet: 'Lomba', noAdd: 1, noDel: 1, f: [['pj', 'Nama PJ'], ['kontak', 'Kontak PJ'], ['status', 'Status pelaksanaan', ['Dilaksanakan', 'Ditunda', 'Dibatalkan']]], show: ['cabang', 'turunan'] },
+  lomba: { t: 'Jenis & Cabang Lomba', sheet: 'Lomba', f: [['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['turunan', 'Kategori lomba', ['Ikhwan', 'Akhwat']], ['jenjang', 'Jenjang', 'jenjang'], ['tipe', 'Tipe', ['Individu', 'Beregu']], ['maks', 'Maks. anggota (beregu)', 'number'], ['waktu', 'Waktu', 'datetime-local'], ['tempat', 'Tempat']], def: { tipe: 'Individu', status: 'Dilaksanakan', turunan: 'Ikhwan' } },
+  pj: { t: 'Status & PJ Lomba', sheet: 'Lomba', noAdd: 1, noDel: 1, f: [['pj', 'Nama PJ'], ['kontak', 'Kontak PJ'], ['status', 'Status pelaksanaan', ['Dilaksanakan', 'Ditunda', 'Dibatalkan']]], show: ['cabang', 'turunan', 'jenjang'] },
   akun: { t: 'Akun PJ Lomba', sheet: 'PJ', f: [['username', 'Username'], ['nama', 'Nama PJ'], ['kontak', 'Kontak'], ['jenis', 'Jenis lomba', 'jenis'], ['password', 'Password', 'password']], show: ['username', 'nama', 'kontak', 'jenis'] },
   peserta: { t: 'Peserta Lomba', sheet: 'Peserta', noAdd: 1, f: [['status', 'Status', ['Terdaftar', 'Terverifikasi', 'Ditolak']], ['juara', 'Juara', ['', '1', '2', '3']]], show: ['no', 'nama', 'markaz', 'kelas', 'lomba_id'] }
 };
@@ -201,6 +208,7 @@ function rowForm(k, id) {
   const fld = ([n, t, ty]) => { const v = r[n] ?? ''; let inp;
     if (Array.isArray(ty)) inp = `<select name="${n}" class="${I}">${opt(ty, v)}</select>`;
     else if (ty === 'jenis') inp = `<select name="${n}" class="${I}">${opt(uniq(A.lm.map(l => l.jenis)), v, 'Pilih jenis lomba')}</select>`;
+    else if (ty === 'jenjang') { const js = uniq([...(C.Siswa || []).map(s => s.jenjang), v]); inp = `<select name="${n}" class="${I}">${opt([['', 'Semua jenjang'], ...(js.length ? js : ['MTs', 'MA'])], v)}</select>`; }
     else if (ty === 'markaz') inp = `<select name="${n}" class="${I}">${opt(A.mk.map(m => m.nama), v, 'Pilih markaz')}</select>`;
     else inp = `<input name="${n}" type="${ty || 'text'}" value="${esc(v)}" class="${I}" ${ty === 'password' ? `autocomplete="new-password" placeholder="${id ? 'Kosongkan bila tidak diubah' : ''}"` : ''}>`;
     return `<div><label class="text-sm font-semibold">${t}</label>${inp}</div>`; };
