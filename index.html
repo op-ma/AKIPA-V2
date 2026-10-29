@@ -151,12 +151,12 @@ function logout() { clearSess(); go('home'); }
 const CFG = {
   siswa: { t: 'Data Siswa', sheet: 'Siswa', f: [['nama', 'Nama'], ['markaz', 'Markaz', 'markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas'], ['nisn', 'NISN'], ['tempat_lahir', 'Tempat lahir'], ['tanggal_lahir', 'Tanggal lahir (dd-mm-yyyy)'], ['kota', 'Kota asal']] },
   markaz: { t: 'Nama Markaz', sheet: 'Markaz', f: [['nama', 'Nama markaz']] },
-  lomba: { t: 'Jenis & Cabang Lomba', sheet: 'Lomba', f: [['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['turunan', 'Kategori lomba', ['Ikhwan', 'Akhwat']], ['jenjang', 'Jenjang', 'jenjang'], ['markaz_ikut', 'Markaz yang dapat mengikuti', 'markaz_multi'], ['tipe', 'Tipe', ['Individu', 'Beregu']], ['maks', 'Maks. anggota (beregu)', 'number'], ['waktu', 'Waktu', 'datetime-local'], ['tempat', 'Tempat']], def: { tipe: 'Individu', status: 'Dilaksanakan', turunan: 'Ikhwan' } },
+  jenis: { t: 'Jenis Lomba', sheet: 'Jenis', noEdit: 1, f: [['nama', 'Nama jenis lomba']] },
   pj: { t: 'Status & PJ Lomba', sheet: 'Lomba', noAdd: 1, noDel: 1, f: [['pj', 'Nama PJ'], ['kontak', 'Kontak PJ'], ['status', 'Status pelaksanaan', ['Dilaksanakan', 'Ditunda', 'Dibatalkan']]], show: ['cabang', 'turunan', 'jenjang'] },
   akun: { t: 'Akun PJ Lomba', sheet: 'PJ', f: [['username', 'Username'], ['nama', 'Nama PJ'], ['kontak', 'Kontak'], ['jenis', 'Jenis lomba', 'jenis'], ['password', 'Password', 'password']], show: ['username', 'nama', 'kontak', 'jenis'] },
   peserta: { t: 'Peserta Lomba', sheet: 'Peserta', noAdd: 1, f: [['status', 'Status', ['Terdaftar', 'Terverifikasi', 'Ditolak']], ['juara', 'Juara', ['', '1', '2', '3']]], show: ['no', 'nama', 'markaz', 'kelas', 'lomba_id'] }
 };
-const MENU = [['dash', 'Ringkasan'], ['siswa', '1. Data siswa'], ['lomba', '2. Lomba'], ['markaz', '3. Markaz'], ['peserta', '4. Peserta'], ['pj', '5. Status lomba'], ['akun', '6. Akun PJ'], ['cetak', '7. Cetak & sertifikat']];
+const MENU = [['dash', 'Ringkasan'], ['siswa', '1. Data siswa'], ['jenis', '2. Jenis lomba'], ['markaz', '3. Markaz'], ['peserta', '4. Peserta'], ['pj', '5. Status lomba'], ['akun', '6. Akun PJ'], ['cetak', '7. Cetak & sertifikat']];
 const A = { rows: [], q: '', fl: '' };
 function vAdmin() {
   if (S.role === 'pj') return vPJ();
@@ -182,7 +182,7 @@ async function aDash() {
 async function aCrud(k, force) {
   const c = CFG[k]; $('#ac').innerHTML = SPIN;
   const f = force ? [c.sheet] : (k === 'peserta' ? ['Peserta'] : []);
-  if (!await getL(['Siswa', 'Markaz', 'Lomba', 'Peserta', 'PJ', 'Setting'], f)) return;
+  if (!await getL(['Siswa', 'Markaz', 'Lomba', 'Peserta', 'PJ', 'Setting', 'Jenis'], f)) return;
   A.rows = C[c.sheet]; A.lm = C.Lomba; A.mk = C.Markaz; A.q = ''; A.fl = ''; aTable(k);
 }
 function aTable(k) {
@@ -200,14 +200,14 @@ function aBody(k) {
   const c = CFG[k], cols = A.cols, LM = Object.fromEntries(A.lm.map(l => [l.id, l])), ed = k === 'pj' || k === 'peserta' ? 'Atur' : 'Ubah';
   const cell = (r, x) => x === 'markaz_ikut' ? (r.markaz_ikut ? r.markaz_ikut.split('|').join(', ') : 'Semua markaz') : x === 'lomba_id' ? lbl(LM[r.lomba_id]) : x === 'waktu' ? (r.waktu ? fmtW(r.waktu) : '-') : r[x];
   const rs = A.rows.filter(r => (!A.q || Object.values(r).join(' ').toLowerCase().includes(A.q)) && (!A.fl || r.lomba_id === A.fl));
-  $('#tb').innerHTML = rs.slice(0, 200).map(r => `<tr class="border-t border-slate-100">${cols.map(h => `<td class="px-3 py-2">${esc(cell(r, h))}</td>`).join('')}${k === 'peserta' ? `<td class="px-3 py-2">${esc(r.status)}${r.juara ? ' / Juara ' + esc(r.juara) : ''}</td>` : ''}<td class="whitespace-nowrap px-3 py-2 text-right"><button title="${ed}" aria-label="${ed}" class="rounded-lg p-1.5 text-pine-700 hover:bg-pine-100" onclick="rowForm('${k}','${r.id}')">${IC.edit}</button>${c.noDel ? '' : `<button title="Hapus" aria-label="Hapus" class="rounded-lg p-1.5 text-red-600 hover:bg-red-50" onclick="rowDel('${k}','${r.id}')">${IC.del}</button>`}</td></tr>`).join('') || '<tr><td class="p-4 text-slate-500" colspan="9">Belum ada data.</td></tr>';
+  $('#tb').innerHTML = rs.slice(0, 200).map(r => `<tr class="border-t border-slate-100">${cols.map(h => `<td class="px-3 py-2">${esc(cell(r, h))}</td>`).join('')}${k === 'peserta' ? `<td class="px-3 py-2">${esc(r.status)}${r.juara ? ' / Juara ' + esc(r.juara) : ''}</td>` : ''}<td class="whitespace-nowrap px-3 py-2 text-right">${c.noEdit ? '' : `<button title="${ed}" aria-label="${ed}" class="rounded-lg p-1.5 text-pine-700 hover:bg-pine-100" onclick="rowForm('${k}','${r.id}')">${IC.edit}</button>`}${c.noDel ? '' : `<button title="Hapus" aria-label="Hapus" class="rounded-lg p-1.5 text-red-600 hover:bg-red-50" onclick="rowDel('${k}','${r.id}')">${IC.del}</button>`}</td></tr>`).join('') || '<tr><td class="p-4 text-slate-500" colspan="9">Belum ada data.</td></tr>';
   $('#tn').textContent = rs.length + ' data' + (rs.length > 200 ? ' (menampilkan 200 pertama, gunakan pencarian)' : '');
 }
 function rowForm(k, id) {
   const c = CFG[k], r = A.rows.find(x => x.id === id) || { ...(c.def || {}) };
   const fld = ([n, t, ty]) => { const v = r[n] ?? ''; let inp;
     if (Array.isArray(ty)) inp = `<select name="${n}" class="${I}">${opt(ty, v)}</select>`;
-    else if (ty === 'jenis') inp = `<select name="${n}" class="${I}">${opt(uniq(A.lm.map(l => l.jenis)), v, 'Pilih jenis lomba')}</select>`;
+    else if (ty === 'jenis') inp = `<select name="${n}" class="${I}">${opt(uniq([...(C.Jenis || []).map(j => j.nama), ...A.lm.map(l => l.jenis), v]), v, 'Pilih jenis lomba')}</select>`;
     else if (ty === 'jenjang') { const js = uniq([...(C.Siswa || []).map(s => s.jenjang), v]); inp = `<select name="${n}" class="${I}">${opt([['', 'Semua jenjang'], ...(js.length ? js : ['MTs', 'MA'])], v)}</select>`; }
     else if (ty === 'markaz_multi') { const cur = String(v).split('|').filter(Boolean); inp = `<div data-mi class="mt-1 space-y-1 rounded-xl border border-slate-200 p-3"><p class="text-xs text-slate-500">Kosongkan semua centang = semua markaz boleh ikut.</p>${A.mk.map(m => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="markaz_ikut" value="${esc(m.nama)}" ${cur.includes(m.nama) ? 'checked' : ''}>${esc(m.nama)}</label>`).join('') || '<p class="text-sm text-slate-400">Belum ada markaz.</p>'}</div>`; }
     else if (ty === 'markaz') inp = `<select name="${n}" class="${I}">${opt(A.mk.map(m => m.nama), v, 'Pilih markaz')}</select>`;
@@ -257,7 +257,7 @@ function pjAddForm() {
   const js = uniq((S.pub?.kelas || []).map(x => x.jenjang));
   modal(`<h3 class="font-disp text-xl font-bold text-pine-800">Tambah cabang lomba</h3><p class="mt-1 text-sm text-slate-600">Jenis lomba: <b>${esc(S.jenis)}</b></p><div class="mt-4 space-y-3">
   <div><label class="text-sm font-semibold">Cabang lomba</label><input id="pa_cabang" class="${I}"></div>
-  <div class="grid gap-3 sm:grid-cols-2"><div><label class="text-sm font-semibold">Kategori</label><select id="pa_turunan" class="${I}">${opt(['Ikhwan', 'Akhwat'], 'Ikhwan')}</select></div>
+  <div class="grid gap-3 sm:grid-cols-2"><div><label class="text-sm font-semibold">Kategori</label><select id="pa_turunan" class="${I}">${opt(['Ikhwan', 'Akhwat', 'Ikhwan & Akhwat'], 'Ikhwan')}</select></div>
   <div><label class="text-sm font-semibold">Jenjang</label><select id="pa_jenjang" class="${I}">${opt([['', 'Semua jenjang'], ...(js.length ? js : ['MTs', 'MA'])], '')}</select></div></div>
   <div class="grid gap-3 sm:grid-cols-2"><div><label class="text-sm font-semibold">Tipe</label><select id="pa_tipe" class="${I}" onchange="$('#pa_mw').classList.toggle('hidden',this.value!='Beregu')">${opt(['Individu', 'Beregu'], 'Individu')}</select></div>
   <div id="pa_mw" class="hidden"><label class="text-sm font-semibold">Maks. anggota</label><input id="pa_maks" type="number" min="1" class="${I}"></div></div>
