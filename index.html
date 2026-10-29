@@ -27,6 +27,7 @@ body{font-family:'Nunito Sans',sans-serif}
 <script>
 // ====== KONFIGURASI: tempel URL Web App Google Apps Script di sini ======
 const API = 'https://script.google.com/macros/s/AKfycbx0vRLSRcF9uPz-q_yCF6QciVv-dmxSjAgT0pZw6I2cIdWoKBFZZTXAnHduh7RKGQBL/exec';
+const FULL = "Ajang Kreativitas dan Intelektualitas Pesantren Al Ma'tuq";
 
 const S = { pub: null, token: localStorage.getItem('akipa_t') || '', v: 'home', ap: 'dash' };
 const $ = s => document.querySelector(s);
@@ -58,16 +59,20 @@ function nav() {
   <button onclick="go('home')" class="font-disp text-2xl font-extrabold tracking-widest text-gold-400">AKIPA</button>
   <nav class="flex flex-wrap gap-1">${L('home', 'Beranda')}${L('lomba', 'Jenis Lomba')}${L('daftar', 'Daftar')}${L(S.token ? 'admin' : 'login', S.token ? 'Dashboard' : 'Login Panitia')}</nav></div></header>`;
 }
-function go(v) { S.v = v; nav(); window.scrollTo(0, 0); ({ home: vHome, lomba: vLomba, daftar: vDaftar, login: vLogin, admin: vAdmin })[v](); }
-async function loadPub() { const d = await api('pub'); if (d) S.pub = d; return !!d; }
-async function boot() { nav(); $('#app').innerHTML = '<p class="p-10 text-center text-slate-500">Memuat data...</p>'; if (!API.startsWith('http')) { $('#app').innerHTML = '<p class="p-10 text-center text-red-600">Isi konstanta API di index.html dengan URL Web App Apps Script.</p>'; return; } await loadPub(); go('home'); }
+async function go(v) { if (S.dirty && ['home', 'lomba', 'daftar'].includes(v)) { S.dirty = false; await loadPub(); } S.v = v; nav(); window.scrollTo(0, 0); ({ home: vHome, lomba: vLomba, daftar: vDaftar, login: vLogin, admin: vAdmin })[v](); }
+async function loadPub() { const d = await api('pub'); if (d) { S.pub = d; try { sessionStorage.setItem('akipa_pub', JSON.stringify(d)); } catch (e) {} } return !!d; }
+async function boot() {
+  nav(); if (!API.startsWith('http')) { $('#app').innerHTML = '<p class="p-10 text-center text-red-600">Isi konstanta API di index.html dengan URL Web App Apps Script.</p>'; return; }
+  let c = null; try { c = JSON.parse(sessionStorage.getItem('akipa_pub')); } catch (e) {}
+  if (c) { S.pub = c; go('home'); loadPub(); } else { $('#app').innerHTML = SPIN; await loadPub(); go('home'); }
+}
 
 // ====== PUBLIK ======
 function vHome() {
-  const ev = S.pub?.set?.event_name || 'Ajang Kompetisi Pesantren';
+  const ev = S.pub?.set?.event_name || '';
   $('#app').innerHTML = `<section class="pattern bg-pine-800 text-white"><div class="mx-auto max-w-6xl px-4 py-16 md:py-24">
-  <p class="text-gold-400 font-semibold">${esc(ev)}</p>
-  <h1 class="font-disp mt-3 text-6xl font-extrabold tracking-widest text-gold-400 md:text-8xl">AKIPA</h1>
+  <h1 class="font-disp text-6xl font-extrabold tracking-widest text-gold-400 md:text-8xl">AKIPA</h1>
+  <p class="mt-2 text-lg font-semibold text-white md:text-2xl">${FULL}</p>${ev ? `<p class="mt-1 text-sm text-gold-400">${esc(ev)}</p>` : ''}
   <p class="mt-4 max-w-xl text-lg text-pine-100">Pilih cabang lomba, daftarkan santri dari markaz Anda, lalu cetak kartu peserta langsung dari halaman ini.</p>
   <div class="mt-8 flex flex-wrap gap-3"><button onclick="go('daftar')" class="rounded-xl bg-gold-400 px-6 py-3 font-bold text-pine-900 hover:bg-gold-500">Daftar sekarang</button>
   <button onclick="go('lomba')" class="rounded-xl border border-white/40 px-6 py-3 font-semibold hover:bg-white/10">Lihat jenis lomba</button></div></div></section>
@@ -116,7 +121,7 @@ async function dSend() {
   b.disabled = false; b.textContent = 'Kirim pendaftaran';
   if (r) { const l = S.pub.lomba.find(x => x.id == lid); $('#app').innerHTML = `<div class="mx-auto max-w-3xl px-4 py-8"><div class="rounded-2xl bg-pine-100 p-5"><h2 class="font-disp text-2xl font-bold text-pine-800">Pendaftaran berhasil</h2><p class="mt-1 text-sm">Simpan atau cetak kartu peserta di bawah ini.</p><div class="mt-4 flex gap-2"><button class="${BP}" onclick='doPrint(window.__k,false)'>Cetak kartu</button><button class="${BS}" onclick="go('daftar')">Daftar lagi</button></div></div><div class="mt-5 grid gap-4 sm:grid-cols-2">${r.map(p => kartu(p, l)).join('')}</div></div>`; window.__k = `<div class="grid grid-cols-2 gap-3">${r.map(p => kartu(p, l)).join('')}</div>`; }
 }
-const kartu = (p, l) => `<div class="kartu"><div class="flex items-center justify-between border-b-4 border-gold-400 bg-pine-800 px-4 py-2 text-white"><b class="font-disp text-xl text-gold-400">AKIPA</b><span class="text-xs">Kartu Peserta</span></div><div class="p-4 text-sm"><div class="font-disp text-2xl font-extrabold text-pine-800">${esc(p.no)}</div><div class="mt-1 text-base font-bold">${esc(p.nama)}</div><div>${esc(p.markaz)} | ${esc(p.jenjang)} ${esc(p.kelas)}</div><div class="text-xs text-slate-600">NISN ${esc(p.nisn || '-')}<br>${esc([p.tempat_lahir, p.tanggal_lahir].filter(Boolean).join(', ') || '-')}<br>${esc(p.kota || '-')}</div><div class="mt-2 font-semibold">${esc(lbl(l))}</div>${p.tim ? `<div>Tim: ${esc(p.tim)}</div>` : ''}<div>${esc(fmtW(l?.waktu))}</div><div>${esc(l?.tempat || '')}</div></div></div>`;
+const kartu = (p, l) => `<div class="kartu"><div class="flex items-center justify-between border-b-4 border-gold-400 bg-pine-800 px-4 py-2 text-white"><b class="font-disp text-xl text-gold-400">AKIPA</b><span class="text-xs">Kartu Peserta</span></div><div class="bg-pine-50 px-4 py-1 text-[10px] text-pine-800">${FULL}</div><div class="p-4 text-sm"><div class="font-disp text-2xl font-extrabold text-pine-800">${esc(p.no)}</div><div class="mt-1 text-base font-bold">${esc(p.nama)}</div><div>${esc(p.markaz)} | ${esc(p.jenjang)} ${esc(p.kelas)}</div><div class="text-xs text-slate-600">NISN ${esc(p.nisn || '-')}<br>${esc([p.tempat_lahir, p.tanggal_lahir].filter(Boolean).join(', ') || '-')}<br>${esc(p.kota || '-')}</div><div class="mt-2 font-semibold">${esc(lbl(l))}</div>${p.tim ? `<div>Tim: ${esc(p.tim)}</div>` : ''}<div>${esc(fmtW(l?.waktu))}</div><div>${esc(l?.tempat || '')}</div></div></div>`;
 
 // ====== LOGIN ======
 function vLogin() { $('#app').innerHTML = `<div class="mx-auto max-w-sm px-4 py-16"><div class="rounded-2xl border border-slate-200 bg-white p-6"><h2 class="font-disp text-2xl font-bold text-pine-800">Login panitia</h2><input id="lp" type="password" class="${I} mt-4" placeholder="Password" onkeydown="if(event.key=='Enter')doLogin()"><button class="${BP} mt-3 w-full" onclick="doLogin()">Masuk</button></div></div>`; }
@@ -127,7 +132,7 @@ function logout() { S.token = ''; localStorage.removeItem('akipa_t'); go('home')
 const CFG = {
   siswa: { t: 'Data Siswa', sheet: 'Siswa', f: [['nama', 'Nama'], ['markaz', 'Markaz', 'markaz'], ['jenjang', 'Jenjang'], ['kelas', 'Kelas'], ['nisn', 'NISN'], ['tempat_lahir', 'Tempat lahir'], ['tanggal_lahir', 'Tanggal lahir (dd-mm-yyyy)'], ['kota', 'Kota asal']] },
   markaz: { t: 'Nama Markaz', sheet: 'Markaz', f: [['nama', 'Nama markaz']] },
-  lomba: { t: 'Jenis & Cabang Lomba', sheet: 'Lomba', f: [['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['turunan', 'Turunan cabang'], ['tipe', 'Tipe', ['Individu', 'Beregu']], ['maks', 'Maks. anggota (beregu)', 'number'], ['waktu', 'Waktu', 'datetime-local'], ['tempat', 'Tempat']], def: { tipe: 'Individu', status: 'Dilaksanakan' } },
+  lomba: { t: 'Jenis & Cabang Lomba', sheet: 'Lomba', f: [['jenis', 'Jenis lomba'], ['cabang', 'Cabang lomba'], ['turunan', 'Kategori lomba', ['Ikhwan', 'Akhwat']], ['tipe', 'Tipe', ['Individu', 'Beregu']], ['maks', 'Maks. anggota (beregu)', 'number'], ['waktu', 'Waktu', 'datetime-local'], ['tempat', 'Tempat']], def: { tipe: 'Individu', status: 'Dilaksanakan', turunan: 'Ikhwan' } },
   pj: { t: 'PJ Lomba', sheet: 'Lomba', noAdd: 1, noDel: 1, f: [['pj', 'Nama PJ'], ['kontak', 'Kontak PJ'], ['status', 'Status pelaksanaan', ['Dilaksanakan', 'Ditunda', 'Dibatalkan']]], show: ['cabang', 'turunan'] },
   peserta: { t: 'Peserta Lomba', sheet: 'Peserta', noAdd: 1, f: [['status', 'Status', ['Terdaftar', 'Terverifikasi', 'Ditolak']], ['juara', 'Juara', ['', '1', '2', '3']]], show: ['no', 'nama', 'markaz', 'kelas', 'lomba_id'] }
 };
@@ -137,28 +142,45 @@ function vAdmin() {
   $('#app').innerHTML = `<div class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row"><aside class="md:w-56 shrink-0"><div class="flex gap-1 overflow-auto md:flex-col">${MENU.map(([k, t]) => `<button onclick="S.ap='${k}';vAdmin()" class="whitespace-nowrap rounded-xl px-3 py-2 text-left text-sm font-semibold ${S.ap === k ? 'bg-pine-700 text-white' : 'bg-white hover:bg-pine-50'}">${t}</button>`).join('')}<button onclick="logout()" class="rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50">Keluar</button></div></aside><section id="ac" class="min-w-0 flex-1"></section></div>`;
   S.ap === 'dash' ? aDash() : S.ap === 'cetak' ? aCetak() : aCrud(S.ap);
 }
+const C = {};
+async function getL(names, force = []) {
+  const need = names.filter(n => !C[n] || force.includes(n));
+  if (need.length) { const d = await api('lists', { sheets: need }); if (!d) return null; Object.assign(C, d); }
+  return names.map(n => C[n]);
+}
+const SPIN = '<div class="flex items-center gap-2 p-6 text-sm text-slate-500"><span class="h-4 w-4 animate-spin rounded-full border-2 border-pine-600 border-t-transparent"></span>Memuat data...</div>';
+const SV = p => `<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const IC = { edit: SV('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>'), del: SV('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>'), refresh: SV('<path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/>') };
+const HL = { lomba_id: 'lomba', turunan: 'kategori', tempat_lahir: 'tempat lahir', tanggal_lahir: 'tanggal lahir' };
 async function aDash() {
-  $('#ac').innerHTML = '<p class="text-slate-500">Memuat...</p>';
-  const [s, l, p] = await Promise.all([api('list', { sheet: 'Siswa' }), api('list', { sheet: 'Lomba' }), api('list', { sheet: 'Peserta' })]); if (!s) return;
+  $('#ac').innerHTML = SPIN;
+  const r = await getL(['Siswa', 'Markaz', 'Lomba', 'Peserta', 'Setting'], ['Peserta']); if (!r) return;
+  const [s, , l, p] = r;
   $('#ac').innerHTML = `<h2 class="font-disp text-2xl font-bold text-pine-800">Ringkasan</h2><div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">${[['Siswa', s.length], ['Cabang lomba', l.length], ['Dilaksanakan', l.filter(x => x.status === 'Dilaksanakan').length], ['Peserta', p.length]].map(([t, n]) => `<div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="text-3xl font-extrabold text-pine-800">${n}</div><div class="text-sm text-slate-500">${t}</div></div>`).join('')}</div>`;
 }
-async function aCrud(k) {
-  const c = CFG[k]; $('#ac').innerHTML = '<p class="text-slate-500">Memuat...</p>';
-  const [r, lm, mk] = await Promise.all([api('list', { sheet: c.sheet }), api('list', { sheet: 'Lomba' }), api('list', { sheet: 'Markaz' })]); if (!r) return;
-  A.rows = r; A.lm = lm; A.mk = mk; A.q = ''; A.fl = ''; aTable(k);
+async function aCrud(k, force) {
+  const c = CFG[k]; $('#ac').innerHTML = SPIN;
+  const f = force ? [c.sheet] : (k === 'peserta' ? ['Peserta'] : []);
+  if (!await getL(['Siswa', 'Markaz', 'Lomba', 'Peserta', 'Setting'], f)) return;
+  A.rows = C[c.sheet]; A.lm = C.Lomba; A.mk = C.Markaz; A.q = ''; A.fl = ''; aTable(k);
 }
 function aTable(k) {
-  const c = CFG[k], cols = c.show || c.f.map(f => f[0]), LM = Object.fromEntries(A.lm.map(l => [l.id, l]));
-  const cell = (r, x) => x === 'lomba_id' ? lbl(LM[r.lomba_id]) : x === 'waktu' ? (r.waktu ? fmtW(r.waktu) : '-') : r[x];
-  let rs = A.rows.filter(r => (!A.q || JSON.stringify(Object.values(r)).toLowerCase().includes(A.q)) && (!A.fl || r.lomba_id === A.fl));
-  const heads = [...new Set([...cols, ...(k === 'lomba' ? [] : [])])];
+  const c = CFG[k], cols = c.show || c.f.map(f => f[0]); A.cols = cols;
   $('#ac').innerHTML = `<div class="flex flex-wrap items-center gap-2"><h2 class="font-disp mr-auto text-2xl font-bold text-pine-800">${c.t}</h2>
-  ${k === 'peserta' ? `<select class="${I} !w-56" onchange="A.fl=this.value;aTable('peserta')">${opt(A.lm.map(l => [l.id, lbl(l)]), A.fl, 'Semua lomba')}</select>` : ''}
-  <input class="${I} !w-44" placeholder="Cari..." value="${esc(A.q)}" oninput="A.q=this.value.toLowerCase();aTable('${k}');this.focus()">
+  ${k === 'peserta' ? `<select class="${I} !w-56" onchange="A.fl=this.value;aBody('peserta')">${opt(A.lm.map(l => [l.id, lbl(l)]), A.fl, 'Semua lomba')}</select>` : ''}
+  <input class="${I} !w-44" placeholder="Cari..." value="${esc(A.q)}" oninput="A.q=this.value.toLowerCase();clearTimeout(A.t);A.t=setTimeout(()=>aBody('${k}'),150)">
+  <button title="Muat ulang" aria-label="Muat ulang" class="${BS} !px-2.5" onclick="aCrud('${k}',1)">${IC.refresh}</button>
   ${k === 'siswa' ? `<button class="${BS}" onclick="impModal()">Impor Excel</button><button class="${BS} !text-red-600" onclick="clearSiswa()">Kosongkan</button>` : ''}
   ${c.noAdd ? '' : `<button class="${BP}" onclick="rowForm('${k}')">Tambah</button>`}</div>
-  <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table class="w-full text-left text-sm"><thead class="bg-pine-50 text-pine-800"><tr>${heads.map(h => `<th class="px-3 py-2 font-semibold capitalize">${h === 'lomba_id' ? 'lomba' : h}</th>`).join('')}${k === 'peserta' ? '<th class="px-3 py-2">Status / Juara</th>' : ''}<th></th></tr></thead><tbody>
-  ${rs.slice(0, 300).map(r => `<tr class="border-t border-slate-100">${heads.map(h => `<td class="px-3 py-2">${esc(cell(r, h))}</td>`).join('')}${k === 'peserta' ? `<td class="px-3 py-2">${esc(r.status)}${r.juara ? ' / Juara ' + esc(r.juara) : ''}</td>` : ''}<td class="whitespace-nowrap px-3 py-2 text-right"><button class="font-semibold text-pine-700" onclick="rowForm('${k}','${r.id}')">${k === 'pj' || k === 'peserta' ? 'Atur' : 'Ubah'}</button>${c.noDel ? '' : ` <button class="ml-2 font-semibold text-red-600" onclick="rowDel('${k}','${r.id}')">Hapus</button>`}</td></tr>`).join('') || `<tr><td class="p-4 text-slate-500" colspan="9">Belum ada data.</td></tr>`}</tbody></table></div>${rs.length > 300 ? '<p class="mt-2 text-xs text-slate-500">Menampilkan 300 data pertama, gunakan pencarian.</p>' : ''}`;
+  <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table class="w-full text-left text-sm"><thead class="bg-pine-50 text-pine-800"><tr>${cols.map(h => `<th class="px-3 py-2 font-semibold capitalize">${HL[h] || h}</th>`).join('')}${k === 'peserta' ? '<th class="px-3 py-2">Status / Juara</th>' : ''}<th class="w-24"></th></tr></thead><tbody id="tb"></tbody></table></div><p id="tn" class="mt-2 text-xs text-slate-500"></p>`;
+  aBody(k);
+}
+function aBody(k) {
+  const c = CFG[k], cols = A.cols, LM = Object.fromEntries(A.lm.map(l => [l.id, l])), ed = k === 'pj' || k === 'peserta' ? 'Atur' : 'Ubah';
+  const cell = (r, x) => x === 'lomba_id' ? lbl(LM[r.lomba_id]) : x === 'waktu' ? (r.waktu ? fmtW(r.waktu) : '-') : r[x];
+  const rs = A.rows.filter(r => (!A.q || Object.values(r).join(' ').toLowerCase().includes(A.q)) && (!A.fl || r.lomba_id === A.fl));
+  $('#tb').innerHTML = rs.slice(0, 200).map(r => `<tr class="border-t border-slate-100">${cols.map(h => `<td class="px-3 py-2">${esc(cell(r, h))}</td>`).join('')}${k === 'peserta' ? `<td class="px-3 py-2">${esc(r.status)}${r.juara ? ' / Juara ' + esc(r.juara) : ''}</td>` : ''}<td class="whitespace-nowrap px-3 py-2 text-right"><button title="${ed}" aria-label="${ed}" class="rounded-lg p-1.5 text-pine-700 hover:bg-pine-100" onclick="rowForm('${k}','${r.id}')">${IC.edit}</button>${c.noDel ? '' : `<button title="Hapus" aria-label="Hapus" class="rounded-lg p-1.5 text-red-600 hover:bg-red-50" onclick="rowDel('${k}','${r.id}')">${IC.del}</button>`}</td></tr>`).join('') || '<tr><td class="p-4 text-slate-500" colspan="9">Belum ada data.</td></tr>';
+  $('#tn').textContent = rs.length + ' data' + (rs.length > 200 ? ' (menampilkan 200 pertama, gunakan pencarian)' : '');
 }
 function rowForm(k, id) {
   const c = CFG[k], r = A.rows.find(x => x.id === id) || { ...(c.def || {}) };
@@ -170,12 +192,17 @@ function rowForm(k, id) {
   modal(`<h3 class="font-disp text-xl font-bold text-pine-800">${id ? 'Ubah' : 'Tambah'} data</h3><form id="rf" class="mt-4 space-y-3">${c.f.map(fld).join('')}</form><div class="mt-5 flex justify-end gap-2"><button class="${BS}" onclick="modal()">Batal</button><button class="${BP}" onclick="rowSave('${k}','${id || ''}')">Simpan</button></div>`);
 }
 async function rowSave(k, id) {
-  const o = { ...(A.rows.find(x => x.id === id) || CFG[k].def || {}) }; new FormData($('#rf')).forEach((v, n) => o[n] = v);
+  const sheet = CFG[k].sheet, o = { ...(A.rows.find(x => x.id === id) || CFG[k].def || {}) }; new FormData($('#rf')).forEach((v, n) => o[n] = v);
   if (id) o.id = id; else delete o.id;
-  if (await api('save', { sheet: CFG[k].sheet, row: o })) { modal(); toast('Tersimpan.'); aCrud(k); }
+  const nid = await api('save', { sheet, row: o }); if (!nid) return;
+  o.id = nid; const arr = C[sheet], i = arr.findIndex(x => x.id === nid); if (i >= 0) arr[i] = { ...arr[i], ...o }; else arr.push(o);
+  S.dirty = true; modal(); toast('Tersimpan.'); aTable(k);
 }
-async function rowDel(k, id) { if (confirm('Hapus data ini?') && await api('del', { sheet: CFG[k].sheet, id })) { toast('Dihapus.'); aCrud(k); } }
-async function clearSiswa() { if (confirm('Hapus SEMUA data siswa?') && await api('clear', { sheet: 'Siswa' })) aCrud('siswa'); }
+async function rowDel(k, id) {
+  if (!confirm('Hapus data ini?')) return; const sheet = CFG[k].sheet;
+  if (await api('del', { sheet, id })) { const i = C[sheet].findIndex(x => x.id === id); if (i >= 0) C[sheet].splice(i, 1); S.dirty = true; toast('Dihapus.'); aTable(k); }
+}
+async function clearSiswa() { if (confirm('Hapus SEMUA data siswa?') && await api('clear', { sheet: 'Siswa' })) { C.Siswa.length = 0; S.dirty = true; aTable('siswa'); } }
 function impModal() { modal(`<h3 class="font-disp text-xl font-bold text-pine-800">Impor data siswa</h3><p class="mt-2 text-sm text-slate-600">File Excel/CSV dengan kolom: <b>nama, markaz, jenjang, kelas, nisn, tempat_lahir, tanggal_lahir, kota</b>. Markaz baru otomatis ditambahkan.</p><input id="fx" type="file" accept=".xlsx,.xls,.csv" class="${I} mt-4"><div class="mt-5 flex justify-end gap-2"><button class="${BS}" onclick="modal()">Batal</button><button class="${BP}" onclick="impGo()">Impor</button></div>`); }
 async function impGo() {
   const f = $('#fx').files[0]; if (!f) return toast('Pilih file dulu.');
@@ -185,14 +212,14 @@ async function impGo() {
   if (!rows.length) return toast('Kolom nama tidak ditemukan.');
   toast('Mengimpor ' + rows.length + ' data...');
   for (let i = 0; i < rows.length; i += 500) if (await api('importSiswa', { rows: rows.slice(i, i + 500) }) === null) return;
-  modal(); toast('Impor selesai.'); aCrud('siswa');
+  modal(); toast('Impor selesai.'); S.dirty = true; delete C.Siswa; delete C.Markaz; aCrud('siswa');
 }
 
 // ====== CETAK & SERTIFIKAT ======
 async function aCetak() {
-  $('#ac').innerHTML = '<p class="text-slate-500">Memuat...</p>';
-  const [lm, ps, set] = await Promise.all([api('list', { sheet: 'Lomba' }), api('list', { sheet: 'Peserta' }), api('pub')]); if (!set) return;
-  A.lm = lm; A.ps = ps; A.set = set.set;
+  $('#ac').innerHTML = SPIN;
+  if (!await getL(['Siswa', 'Markaz', 'Lomba', 'Peserta', 'Setting'], ['Peserta'])) return;
+  const lm = C.Lomba; A.lm = lm; A.ps = C.Peserta; A.set = C.Setting;
   const s = A.set, v = (k, d = '') => esc(s[k] ?? d);
   $('#ac').innerHTML = `<h2 class="font-disp text-2xl font-bold text-pine-800">Cetak kartu, daftar hadir & sertifikat</h2>
   <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5"><label class="text-sm font-semibold">Pilih lomba</label><select id="cl" class="${I}">${opt(lm.map(l => [l.id, lbl(l)]), '', 'Semua lomba')}</select>
@@ -207,11 +234,11 @@ async function aCetak() {
   <div><label class="text-sm font-semibold">Warna teks</label><input id="s_cert_color" type="color" class="${I} !h-10" value="${v('cert_color', '#111111')}"></div></div>
   <p class="mt-2 text-xs text-slate-500">Kode yang tersedia: {nama} {markaz} {kelas} {nisn} {ttl} {kota} {lomba} {juara}</p><button class="${BP} mt-3" onclick="saveSet()">Simpan pengaturan</button></div>`;
 }
-async function saveSet() { const kv = {}; document.querySelectorAll('[id^=s_]').forEach(e => kv[e.id.slice(2)] = e.value); if (await api('setting', { kv })) { toast('Pengaturan tersimpan.'); } }
+async function saveSet() { const kv = {}; document.querySelectorAll('[id^=s_]').forEach(e => kv[e.id.slice(2)] = e.value); if (await api('setting', { kv })) { Object.assign(C.Setting, kv); S.dirty = true; toast('Pengaturan tersimpan.'); } }
 async function upCert() {
   const f = $('#cf').files[0]; if (!f) return toast('Pilih gambar dulu.'); toast('Mengunggah...');
   const data = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(f); });
-  const url = await api('upload', { data, mime: f.type, name: f.name }); if (url && await api('setting', { kv: { cert_bg: url } })) { toast('Desain terunggah.'); aCetak(); }
+  const url = await api('upload', { data, mime: f.type, name: f.name }); if (url && await api('setting', { kv: { cert_bg: url } })) { C.Setting.cert_bg = url; toast('Desain terunggah.'); aCetak(); }
 }
 function selP() { const id = $('#cl').value, LM = Object.fromEntries(A.lm.map(l => [l.id, l])); return A.ps.filter(p => !id || p.lomba_id === id).map(p => [p, LM[p.lomba_id]]); }
 function pKartu() { const r = selP(); if (!r.length) return toast('Belum ada peserta.'); doPrint(`<div class="grid grid-cols-2 gap-3">${r.map(([p, l]) => kartu(p, l)).join('')}</div>`, false); }
